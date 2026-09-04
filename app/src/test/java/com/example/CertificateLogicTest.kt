@@ -135,4 +135,27 @@ class CertificateLogicTest {
         dao.deleteCertificateById("LGES-3003")
         assertEquals(0, dao.getAllCertificates().first().size)
     }
+
+    @Test
+    fun testCertificateDrawerTemplateRendering() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val cert = Certificate.create(
+            rollNo = "LGES24K001",
+            studentName = "Avantika Yogi",
+            fatherName = "Naval Kishor Yogi",
+            courseName = "ADITCM",
+            sessionRange = "2025–2026",
+            duration = "450 Hours",
+            grade = "S",
+            placeOfIssue = "Kanta",
+            dateOfIssue = "26 July 2026",
+            certType = "Course",
+            isSynced = false
+        )
+
+        val bitmap = com.example.ui.CertificateDrawer.drawCertificate(context, cert, null)
+        assertNotNull(bitmap)
+        assertEquals(2400, bitmap.width)
+        assertEquals(1600, bitmap.height)
+    }
 }
