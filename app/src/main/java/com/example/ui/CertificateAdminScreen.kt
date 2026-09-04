@@ -138,6 +138,7 @@ fun CertificateAdminScreen(
     // Form state bindings
     val rollNo by viewModel.rollNo.collectAsStateWithLifecycle()
     val studentName by viewModel.studentName.collectAsStateWithLifecycle()
+    val relationPrefix by viewModel.relationPrefix.collectAsStateWithLifecycle()
     val fatherName by viewModel.fatherName.collectAsStateWithLifecycle()
     val courseName by viewModel.courseName.collectAsStateWithLifecycle()
     val sessionRange by viewModel.sessionRange.collectAsStateWithLifecycle()
@@ -147,6 +148,7 @@ fun CertificateAdminScreen(
     val dateOfIssue by viewModel.dateOfIssue.collectAsStateWithLifecycle()
     val certType by viewModel.certType.collectAsStateWithLifecycle()
     val webAppUrl by viewModel.webAppUrl.collectAsStateWithLifecycle()
+    val verificationBaseUrl by viewModel.verificationBaseUrl.collectAsStateWithLifecycle()
 
     val isUploading by viewModel.isUploading.collectAsStateWithLifecycle()
     val uploadStatus by viewModel.uploadStatus.collectAsStateWithLifecycle()
@@ -158,19 +160,26 @@ fun CertificateAdminScreen(
     var isGeneratingPreview by remember { mutableStateOf(false) }
 
     LaunchedEffect(
-        rollNo, studentName, fatherName, courseName,
-        sessionRange, duration, grade, placeOfIssue, dateOfIssue, certType
+        rollNo, studentName, relationPrefix, fatherName, courseName,
+        sessionRange, duration, grade, placeOfIssue, dateOfIssue, certType, verificationBaseUrl
     ) {
         isGeneratingPreview = true
-        delay(300)
+        delay(250)
         withContext(Dispatchers.Default) {
-            val cert = viewModel.getAsCertificate()
-            val qrLink = "https://lges-computer-classes.netlify.app/verify.html?certNo=${cert.rollNo}"
-            val qr = Exporter.generateQrCode(qrLink, 250)
-            val bmp = CertificateDrawer.drawCertificate(context, cert, qr)
-            withContext(Dispatchers.Main) {
-                previewBitmap = bmp
-                isGeneratingPreview = false
+            try {
+                val cert = viewModel.getAsCertificate()
+                val qrLink = com.example.util.CertificateConfig.buildVerificationUrl(cert.certificateId, verificationBaseUrl)
+                val qr = if (cert.certificateId.isNotBlank()) Exporter.generateQrCode(qrLink, 250) else null
+                val bmp = CertificateDrawer.drawCertificate(context, cert, qr)
+                withContext(Dispatchers.Main) {
+                    previewBitmap = bmp
+                    isGeneratingPreview = false
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    isGeneratingPreview = false
+                }
             }
         }
     }
@@ -262,7 +271,8 @@ fun CertificateAdminScreen(
                 ) {
                     val tabs = listOf(
                         Triple(0, "Dashboard", Icons.Default.Dashboard),
-                        Triple(1, "Certificates", Icons.Default.WorkspacePremium)
+                        Triple(1, "Certificates", Icons.Default.WorkspacePremium),
+                        Triple(2, "Settings", Icons.Default.Settings)
                     )
 
                     tabs.forEach { (index, title, icon) ->
@@ -281,7 +291,7 @@ fun CertificateAdminScreen(
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = title,
-                                    tint = LgesNavy,
+                                    tint = if (isSelected) LgesNavy else LgesNavy.copy(alpha = 0.5f),
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -291,7 +301,7 @@ fun CertificateAdminScreen(
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Serif,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = LgesNavy
+                                color = if (isSelected) LgesNavy else LgesNavy.copy(alpha = 0.6f)
                             )
                             if (isSelected) {
                                 Spacer(modifier = Modifier.height(2.dp))
@@ -332,6 +342,7 @@ fun CertificateAdminScreen(
                     uploadError = uploadError,
                     webAppUrlConfigured = webAppUrl.isNotEmpty()
                 )
+                2 -> SettingsTab(viewModel = viewModel)
             }
         }
     }
@@ -440,10 +451,10 @@ fun DashboardTab(
                         }
                     }
 
-                    // Pending Verification
+                    // Synced to Cloud
                     DocumentCard(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "PENDING VERIFICATION",
+                            text = "SYNCED TO CLOUD",
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold,
@@ -455,14 +466,20 @@ fun DashboardTab(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            val syncedCount = certificates.count { it.isSynced }
                             Text(
-                                text = "0",
-                                fontSize = 22.sp,
+                                text = "$syncedCount/${certificates.size}",
+                                fontSize = 20.sp,
                                 fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold,
                                 color = LgesNavy
                             )
-                            Icon(Icons.Outlined.HourglassEmpty, contentDescription = null, tint = LgesGold, modifier = Modifier.size(18.dp))
+                            Icon(
+                                if (syncedCount == certificates.size && certificates.isNotEmpty()) Icons.Outlined.CloudDone else Icons.Outlined.CloudQueue,
+                                contentDescription = null,
+                                tint = if (syncedCount == certificates.size && certificates.isNotEmpty()) Color(0xFF2E7D32) else LgesGold,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
@@ -513,13 +530,18 @@ fun DashboardTab(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = if (certificates.isEmpty()) "0%" else "100%",
-                                fontSize = 22.sp,
+                                text = "N/A",
+                                fontSize = 18.sp,
                                 fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold,
-                                color = LgesNavy
+                                color = LgesNavy.copy(alpha = 0.7f)
                             )
-                            Icon(Icons.Outlined.VerifiedUser, contentDescription = null, tint = LgesGold, modifier = Modifier.size(18.dp))
+                            Text(
+                                text = "Unmetered",
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Serif,
+                                color = LgesNavy.copy(alpha = 0.5f)
+                            )
                         }
                     }
                 }
@@ -633,13 +655,13 @@ fun DashboardTab(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(4.dp))
-                                                .background(LgesNavy)
-                                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                                .background(if (cert.isSynced) Color(0xFF2E7D32) else LgesNavy)
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) {
                                             Text(
-                                                text = "Verified",
+                                                text = if (cert.isSynced) "Synced" else "Local",
                                                 color = Color.White,
-                                                fontSize = 12.sp,
+                                                fontSize = 11.sp,
                                                 fontFamily = FontFamily.Serif,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -862,6 +884,8 @@ fun CertificatesTab(
     val placeOfIssue by viewModel.placeOfIssue.collectAsStateWithLifecycle()
     val dateOfIssue by viewModel.dateOfIssue.collectAsStateWithLifecycle()
     val certType by viewModel.certType.collectAsStateWithLifecycle()
+    val validationErrors by viewModel.validationErrors.collectAsStateWithLifecycle()
+    val duplicateNote by viewModel.duplicateNote.collectAsStateWithLifecycle()
 
     var gradeDropdownExpanded by remember { mutableStateOf(false) }
     val grades = listOf("S", "A", "C", "D", "F")
@@ -919,7 +943,9 @@ fun CertificatesTab(
                     certType = certType,
                     gradeDropdownExpanded = gradeDropdownExpanded,
                     onGradeDropdownToggle = { gradeDropdownExpanded = it },
-                    grades = grades
+                    grades = grades,
+                    validationErrors = validationErrors,
+                    duplicateNote = duplicateNote
                 )
             }
         }
@@ -996,7 +1022,9 @@ fun FormFieldsSection(
     certType: String,
     gradeDropdownExpanded: Boolean,
     onGradeDropdownToggle: (Boolean) -> Unit,
-    grades: List<String>
+    grades: List<String>,
+    validationErrors: FormValidationErrors,
+    duplicateNote: String?
 ) {
     val context = LocalContext.current
     val textFieldColors = OutlinedTextFieldDefaults.colors(
@@ -1055,12 +1083,33 @@ fun FormFieldsSection(
             }
         }
 
+        // Duplicate Notification Card
+        if (duplicateNote != null) {
+            Surface(
+                color = Color(0xFFFFF8E1),
+                shape = RoundedCornerShape(6.dp),
+                border = BorderStroke(1.dp, LgesGold),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = LgesNavy, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(duplicateNote, fontSize = 12.sp, fontFamily = FontFamily.Serif, color = LgesNavy)
+                }
+            }
+        }
+
         // Roll No / Certificate No
         OutlinedTextField(
             value = rollNo,
-            onValueChange = { viewModel.rollNo.value = it },
+            onValueChange = {
+                viewModel.rollNo.value = it
+                viewModel.checkForDuplicateRollNo(it)
+            },
             label = { Text("Roll No. / Certificate No.", fontFamily = FontFamily.Serif) },
             leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+            isError = validationErrors.rollNoError != null,
+            supportingText = { validationErrors.rollNoError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) } },
             singleLine = true,
             colors = textFieldColors,
             modifier = Modifier.fillMaxWidth().testTag("roll_no_input")
@@ -1072,6 +1121,8 @@ fun FormFieldsSection(
             onValueChange = { viewModel.studentName.value = it },
             label = { Text("Student Name", fontFamily = FontFamily.Serif) },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+            isError = validationErrors.studentNameError != null,
+            supportingText = { validationErrors.studentNameError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) } },
             singleLine = true,
             colors = textFieldColors,
             modifier = Modifier.fillMaxWidth().testTag("student_name_input")
@@ -1124,6 +1175,8 @@ fun FormFieldsSection(
                     onValueChange = { viewModel.fatherName.value = it },
                     label = { Text("$relationPrefix Name / Father's Name", fontFamily = FontFamily.Serif) },
                     leadingIcon = { Icon(Icons.Default.SupervisorAccount, contentDescription = null) },
+                    isError = validationErrors.fatherNameError != null,
+                    supportingText = { validationErrors.fatherNameError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) } },
                     singleLine = true,
                     colors = textFieldColors,
                     modifier = Modifier.fillMaxWidth().testTag("father_name_input")
@@ -1137,6 +1190,8 @@ fun FormFieldsSection(
             onValueChange = { viewModel.courseName.value = it },
             label = { Text(if (certType == "Course") "Course Name" else "Internship Name", fontFamily = FontFamily.Serif) },
             leadingIcon = { Icon(Icons.Default.Book, contentDescription = null) },
+            isError = validationErrors.courseNameError != null,
+            supportingText = { validationErrors.courseNameError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) } },
             singleLine = true,
             colors = textFieldColors,
             modifier = Modifier.fillMaxWidth().testTag("course_name_input")
@@ -1217,6 +1272,8 @@ fun FormFieldsSection(
                 onValueChange = { viewModel.dateOfIssue.value = it },
                 label = { Text("Date of Issue", fontFamily = FontFamily.Serif) },
                 leadingIcon = { Icon(Icons.Default.Event, contentDescription = null) },
+                isError = validationErrors.dateOfIssueError != null,
+                supportingText = { validationErrors.dateOfIssueError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) } },
                 singleLine = true,
                 colors = textFieldColors,
                 modifier = Modifier.weight(1f).testTag("date_of_issue_input")
@@ -1375,8 +1432,11 @@ fun ExportControlsSection(
             Button(
                 onClick = {
                     viewModel.saveCertificateLocally(
-                        onSuccess = { Toast.makeText(context, "Saved to database!", Toast.LENGTH_SHORT).show() },
-                        onError = { err -> Toast.makeText(context, "Error: $err", Toast.LENGTH_SHORT).show() }
+                        onSuccess = { isUpdate ->
+                            val msg = if (isUpdate) "Certificate updated in database!" else "Saved to database!"
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { err -> Toast.makeText(context, err, Toast.LENGTH_LONG).show() }
                     )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = LgesGold, contentColor = LgesNavy),
@@ -1388,6 +1448,20 @@ fun ExportControlsSection(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Generate & Save", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif)
             }
+        }
+
+        // Manual Cloud Sync button
+        Button(
+            onClick = { viewModel.uploadCertificateToSheets() },
+            colors = ButtonDefaults.buttonColors(containerColor = LgesNavy, contentColor = Color.White),
+            border = BorderStroke(1.dp, LgesGold),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier.fillMaxWidth().height(46.dp).testTag("sync_sheets_button"),
+            enabled = !isUploading
+        ) {
+            Icon(Icons.Default.CloudUpload, contentDescription = null, tint = LgesGold)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Sync Certificate to Google Sheets", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif)
         }
 
         if (isUploading) {
@@ -1412,10 +1486,48 @@ fun HistoryTab(
     certificates: List<Certificate>,
     onSelectCertificate: (Certificate) -> Unit
 ) {
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
+    var certToDelete by remember { mutableStateOf<Certificate?>(null) }
+
+    if (certToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { certToDelete = null },
+            title = {
+                Text("Delete Certificate", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, color = LgesNavy)
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete the certificate for ${certToDelete?.studentName} (${certToDelete?.certificateId})? This action cannot be undone.",
+                    fontFamily = FontFamily.Serif
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        certToDelete?.let { cert ->
+                            viewModel.deleteCertificate(cert.certificateId) {
+                                Toast.makeText(context, "Certificate deleted.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        certToDelete = null
+                    }
+                ) {
+                    Text("Delete", color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { certToDelete = null }) {
+                    Text("Cancel", color = LgesNavy)
+                }
+            }
+        )
+    }
+
     val filteredCertificates = certificates.filter {
         it.studentName.contains(searchQuery, ignoreCase = true) ||
                 it.rollNo.contains(searchQuery, ignoreCase = true) ||
+                it.certificateId.contains(searchQuery, ignoreCase = true) ||
                 it.courseName.contains(searchQuery, ignoreCase = true)
     }
 
@@ -1436,7 +1548,7 @@ fun HistoryTab(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search by Student, Roll No, Course...", fontFamily = FontFamily.Serif) },
+            placeholder = { Text("Search by Student, Roll No, ID, Course...", fontFamily = FontFamily.Serif) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = LgesNavy) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
@@ -1487,13 +1599,33 @@ fun HistoryTab(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(LgesNavy)
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text(cert.certType.uppercase(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(LgesNavy)
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(cert.certType.uppercase(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif)
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (cert.isSynced) Color(0xFF2E7D32) else Color(0xFF757575))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (cert.isSynced) "Synced" else "Local",
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Serif
+                                        )
+                                    }
                                 }
 
                                 Row {
@@ -1504,7 +1636,7 @@ fun HistoryTab(
                                         Icon(Icons.Default.Edit, contentDescription = "Edit", tint = LgesNavy)
                                     }
                                     IconButton(
-                                        onClick = { viewModel.deleteCertificate(cert.rollNo) },
+                                        onClick = { certToDelete = cert },
                                         modifier = Modifier.size(32.dp)
                                     ) {
                                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFC62828))
@@ -1512,11 +1644,304 @@ fun HistoryTab(
                                 }
                             }
 
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(cert.studentName, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = LgesNavy)
                             Text("Course: ${cert.courseName}", fontFamily = FontFamily.Serif, fontSize = 12.sp, color = LgesNavy.copy(alpha = 0.8f))
-                            Text("Roll No: ${cert.rollNo} | Grade: ${cert.grade}", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = LgesNavy.copy(alpha = 0.6f))
+                            Text("ID: ${cert.certificateId} | Roll: ${cert.rollNo} | Grade: ${cert.grade}", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = LgesNavy.copy(alpha = 0.6f))
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Settings Tab for configuring Cloud Sync and Verification Portal
+ */
+@Composable
+fun SettingsTab(viewModel: CertificateViewModel) {
+    val context = LocalContext.current
+    val webAppUrl by viewModel.webAppUrl.collectAsStateWithLifecycle()
+    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
+    val verificationBaseUrl by viewModel.verificationBaseUrl.collectAsStateWithLifecycle()
+    val isTestingConnection by viewModel.isTestingConnection.collectAsStateWithLifecycle()
+
+    var inputUrl by remember(webAppUrl) { mutableStateOf(webAppUrl) }
+    var inputApiKey by remember(apiKey) { mutableStateOf(apiKey) }
+    var inputVerificationUrl by remember(verificationBaseUrl) { mutableStateOf(verificationBaseUrl) }
+    var connectionTestResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = LgesNavy,
+        unfocusedBorderColor = LgesNavy.copy(alpha = 0.3f),
+        focusedLabelColor = LgesNavy,
+        unfocusedLabelColor = LgesNavy.copy(alpha = 0.6f),
+        focusedTextColor = LgesNavy,
+        unfocusedTextColor = LgesNavy,
+        focusedLeadingIconColor = LgesNavy,
+        unfocusedLeadingIconColor = LgesNavy.copy(alpha = 0.4f),
+        focusedContainerColor = Color.White,
+        unfocusedContainerColor = Color.White
+    )
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                text = "System & Cloud Settings",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    color = LgesNavy
+                )
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Configure your Google Sheets synchronization endpoint, security passphrase, and verification portal URL.",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = FontFamily.Serif,
+                    color = LgesNavy.copy(alpha = 0.75f),
+                    fontSize = 13.sp
+                )
+            )
+        }
+
+        // Google Sheets Web App Endpoint
+        item {
+            DocumentCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Google Sheets Web App URL",
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = LgesNavy
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "The Apps Script deployment endpoint ending with /exec.",
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Serif,
+                    color = LgesNavy.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = inputUrl,
+                    onValueChange = { inputUrl = it },
+                    label = { Text("Web App Endpoint URL", fontFamily = FontFamily.Serif) },
+                    leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null) },
+                    singleLine = false,
+                    maxLines = 3,
+                    colors = textFieldColors,
+                    modifier = Modifier.fillMaxWidth().testTag("settings_web_app_url_input")
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.updateWebAppUrl(inputUrl)
+                            Toast.makeText(context, "Web App URL saved!", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = LgesNavy, contentColor = Color.White),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Save URL", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.testConnection { success, msg ->
+                                connectionTestResult = Pair(success, msg)
+                            }
+                        },
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LgesNavy),
+                        border = BorderStroke(1.dp, LgesNavy),
+                        modifier = Modifier.weight(1f),
+                        enabled = !isTestingConnection
+                    ) {
+                        if (isTestingConnection) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = LgesNavy, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Testing...", fontSize = 12.sp)
+                        } else {
+                            Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Test", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                if (connectionTestResult != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val (success, msg) = connectionTestResult!!
+                    Surface(
+                        color = if (success) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (success) Icons.Default.CheckCircle else Icons.Default.Error,
+                                contentDescription = null,
+                                tint = if (success) Color(0xFF2E7D32) else Color(0xFFC62828)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = msg,
+                                color = if (success) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Serif,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Security Passphrase
+        item {
+            DocumentCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "API Security Passphrase (Optional)",
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = LgesNavy
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "If configured in google-apps-script.js, incoming requests must match this key.",
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Serif,
+                    color = LgesNavy.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = inputApiKey,
+                    onValueChange = { inputApiKey = it },
+                    label = { Text("Security Passphrase", fontFamily = FontFamily.Serif) },
+                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
+                    singleLine = true,
+                    colors = textFieldColors,
+                    modifier = Modifier.fillMaxWidth().testTag("settings_api_key_input")
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = {
+                        viewModel.updateApiKey(inputApiKey)
+                        Toast.makeText(context, "API Key updated!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = LgesNavy, contentColor = Color.White),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Save Passphrase", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Online Verification Portal URL
+        item {
+            DocumentCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Online Verification Portal URL",
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = LgesNavy
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Base URL embedded into certificate QR codes for public verification.",
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Serif,
+                    color = LgesNavy.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = inputVerificationUrl,
+                    onValueChange = { inputVerificationUrl = it },
+                    label = { Text("Verification Base URL", fontFamily = FontFamily.Serif) },
+                    leadingIcon = { Icon(Icons.Default.QrCode, contentDescription = null) },
+                    singleLine = true,
+                    colors = textFieldColors,
+                    modifier = Modifier.fillMaxWidth().testTag("settings_verification_url_input")
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.updateVerificationBaseUrl(inputVerificationUrl)
+                            Toast.makeText(context, "Verification Portal URL saved!", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = LgesNavy, contentColor = Color.White),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Save Portal URL", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.resetSettingsToDefault()
+                            inputUrl = viewModel.webAppUrl.value
+                            inputApiKey = viewModel.apiKey.value
+                            inputVerificationUrl = viewModel.verificationBaseUrl.value
+                            Toast.makeText(context, "Settings reset to defaults!", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC62828)),
+                        border = BorderStroke(1.dp, Color(0xFFC62828)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Reset Defaults", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Deployment & Setup Guide Card
+        item {
+            Surface(
+                color = Color(0xFFE8EAF6),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, LgesNavy.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = LgesNavy, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Deployment & Verification Architecture",
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold,
+                            color = LgesNavy,
+                            fontSize = 14.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "1. Google Apps Script: Deploy as Web App with 'Execute as: Me' and 'Who has access: Anyone'.\n" +
+                                "2. Deduplication: Updates rows matching the Certificate ID (LGES-{rollNo}) without adding duplicates.\n" +
+                                "3. Verification: Scanners read QR code to open the Netlify portal with ?certNo=LGES-{rollNo}.",
+                        fontFamily = FontFamily.Serif,
+                        color = LgesNavy.copy(alpha = 0.85f),
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
                 }
             }
         }

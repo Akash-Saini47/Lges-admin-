@@ -113,7 +113,7 @@ object CertificateDrawer {
             duration = cert.duration,
             dateOfIssue = cert.dateOfIssue,
             placeOfIssue = cert.placeOfIssue,
-            website = "https://lges-computer-classes.netlify.app/"
+            website = com.example.util.CertificateConfig.DEFAULT_INSTITUTE_WEBSITE
         )
         return draw(context, certData, qrBitmap)
     }
@@ -430,7 +430,16 @@ object CertificateDrawer {
 
         fill.typeface = SERIF_ITALIC
         fill.textSize = 32f
-        c.drawText("D/O or S/O ${cert.guardian}", BODY_CX, Y_GUARDIAN, fill)
+        val guardianText = when {
+            cert.guardian.isBlank() -> ""
+            cert.guardian.startsWith("S/O", ignoreCase = true) ||
+            cert.guardian.startsWith("D/O", ignoreCase = true) ||
+            cert.guardian.startsWith("W/O", ignoreCase = true) -> cert.guardian
+            else -> "S/O or D/O ${cert.guardian}"
+        }
+        if (guardianText.isNotBlank()) {
+            c.drawText(guardianText, BODY_CX, Y_GUARDIAN, fill)
+        }
 
         fill.typeface = SERIF
         fill.textSize = 36f

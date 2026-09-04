@@ -13,33 +13,52 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.example.database.Certificate
+import com.example.util.CertificateConfig
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object Exporter {
 
-    // 1. Generate QR Code programmatically using ZXing Core
+    /**
+     * Sanitizes file names by replacing unsafe filesystem characters.
+     */
+    fun sanitizeFileName(rawName: String): String {
+        return rawName.trim().replace(Regex("[\\\\/:*?\"<>|\\s]+"), "_")
+    }
+
+    /**
+     * Generates QR Code bitmap using ZXing.
+     * Returns null if input is blank or encoding fails.
+     */
     fun generateQrCode(text: String, size: Int = 400): Bitmap? {
-        if (text.isEmpty()) return null
+        val cleanText = text.trim()
+        if (cleanText.isEmpty() || size <= 0) return null
         return try {
             val bitMatrix: BitMatrix = MultiFormatWriter().encode(
-                text,
+                cleanText,
                 BarcodeFormat.QR_CODE,
                 size,
                 size
             )
             val width = bitMatrix.width
             val height = bitMatrix.height
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            for (x in 0 until width) {
-                for (y in 0 until height) {
-                    bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE)
+            val pixels = IntArray(width * height)
+            for (y in 0 until height) {
+                val offset = y * width
+                for (x in 0 until width) {
+                    pixels[offset + x] = if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE
                 }
             }
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
             bitmap
         } catch (e: Exception) {
             e.printStackTrace()
@@ -47,16 +66,18 @@ object Exporter {
         }
     }
 
-    // 2. Save Bitmap as PNG using MediaStore (Modern API)
+    /**
+     * Saves Bitmap as PNG to device Pictures storage.
+     */
     fun saveBitmapToDevice(context: Context, bitmap: Bitmap, fileName: String): Uri? {
-        val nameWithExtension = "$fileName.png"
+        val safeName = sanitizeFileName(fileName).ifBlank { "LGES_Certificate" } + ".png"
         var outputStream: OutputStream? = null
         var uri: Uri? = null
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, nameWithExtension)
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/LGES_Certificates")
                 }
@@ -70,7 +91,7 @@ object Exporter {
                 if (!directory.exists()) {
                     directory.mkdirs()
                 }
-                val file = File(directory, nameWithExtension)
+                val file = File(directory, safeName)
                 uri = Uri.fromFile(file)
                 outputStream = FileOutputStream(file)
             }
@@ -78,35 +99,40 @@ object Exporter {
             if (outputStream != null) {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
                 outputStream.flush()
-                Toast.makeText(context, "Saved Certificate Image to Pictures!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Saved Certificate Image to Pictures/LGES_Certificates!", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            Toast.makeText(context, "Failed to save: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Failed to save Image: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
         } finally {
-            outputStream?.close()
+            try {
+                outputStream?.close()
+            } catch (_: Exception) {}
         }
         return uri
     }
 
-    // 3. Convert Bitmap to PDF and save to device using MediaStore
+    /**
+     * Converts Bitmap to PDF and saves to Downloads storage.
+     */
     fun savePdfToDevice(context: Context, bitmap: Bitmap, fileName: String): Uri? {
-        val nameWithExtension = "$fileName.pdf"
+        val safeName = sanitizeFileName(fileName).ifBlank { "LGES_Certificate" } + ".pdf"
         var outputStream: OutputStream? = null
         var uri: Uri? = null
-
-        val pdfDocument = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, 1).create()
-        val page = pdfDocument.startPage(pageInfo)
-        val canvas = page.canvas
-        val paint = Paint().apply { isFilterBitmap = true }
-        canvas.drawBitmap(bitmap, 0f, 0f, paint)
-        pdfDocument.finishPage(page)
+        var pdfDocument: PdfDocument? = null
 
         try {
+            pdfDocument = PdfDocument()
+            val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, 1).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+            val paint = Paint().apply { isFilterBitmap = true }
+            canvas.drawBitmap(bitmap, 0f, 0f, paint)
+            pdfDocument.finishPage(page)
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, nameWithExtension)
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/LGES_Certificates")
                 }
@@ -120,51 +146,60 @@ object Exporter {
                 if (!directory.exists()) {
                     directory.mkdirs()
                 }
-                val file = File(directory, nameWithExtension)
+                val file = File(directory, safeName)
                 uri = Uri.fromFile(file)
                 outputStream = FileOutputStream(file)
             }
 
             if (outputStream != null) {
                 pdfDocument.writeTo(outputStream)
-                Toast.makeText(context, "Saved Certificate PDF to Downloads!", Toast.LENGTH_SHORT).show()
+                outputStream.flush()
+                Toast.makeText(context, "Saved Certificate PDF to Downloads/LGES_Certificates!", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "Failed to save PDF: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
         } finally {
-            outputStream?.close()
-            pdfDocument.close()
+            try {
+                outputStream?.close()
+            } catch (_: Exception) {}
+            try {
+                pdfDocument?.close()
+            } catch (_: Exception) {}
         }
         return uri
     }
 
-    // 4. Share PDF File directly via Intent using temporary cache FileProvider
+    /**
+     * Shares PDF via Intent with dynamic FileProvider authority.
+     */
     fun sharePdf(context: Context, bitmap: Bitmap, fileName: String) {
-        val pdfDocument = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, 1).create()
-        val page = pdfDocument.startPage(pageInfo)
-        val canvas = page.canvas
-        val paint = Paint().apply { isFilterBitmap = true }
-        canvas.drawBitmap(bitmap, 0f, 0f, paint)
-        pdfDocument.finishPage(page)
+        val safeName = sanitizeFileName(fileName).ifBlank { "LGES_Certificate" } + ".pdf"
+        var pdfDocument: PdfDocument? = null
+        var outputStream: FileOutputStream? = null
 
         try {
+            pdfDocument = PdfDocument()
+            val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, 1).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+            val paint = Paint().apply { isFilterBitmap = true }
+            canvas.drawBitmap(bitmap, 0f, 0f, paint)
+            pdfDocument.finishPage(page)
+
             val cachePath = File(context.cacheDir, "shared_certificates")
             if (!cachePath.exists()) {
                 cachePath.mkdirs()
             }
-            val pdfFile = File(cachePath, "$fileName.pdf")
-            val outputStream = FileOutputStream(pdfFile)
+            val pdfFile = File(cachePath, safeName)
+            outputStream = FileOutputStream(pdfFile)
             pdfDocument.writeTo(outputStream)
             outputStream.flush()
             outputStream.close()
+            outputStream = null
 
-            val contentUri = FileProvider.getUriForFile(
-                context,
-                "com.aistudio.lgesadmin.kypwzm.fileprovider",
-                pdfFile
-            )
+            val authority = "${context.packageName}.fileprovider"
+            val contentUri = FileProvider.getUriForFile(context, authority, pdfFile)
 
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/pdf"
@@ -173,39 +208,81 @@ object Exporter {
                 putExtra(Intent.EXTRA_TEXT, "Attached is the verified certificate of completion from LGES.")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(shareIntent, "Share Certificate PDF via"))
+            val chooser = Intent.createChooser(shareIntent, "Share Certificate PDF via").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "Failed to share PDF: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
         } finally {
-            pdfDocument.close()
+            try {
+                outputStream?.close()
+            } catch (_: Exception) {}
+            try {
+                pdfDocument?.close()
+            } catch (_: Exception) {}
         }
     }
 
-    // 5. Share CSV of all saved certificates in registry
-    fun shareCsvRegistry(context: Context, certificates: List<com.example.database.Certificate>) {
+    /**
+     * Exports and shares CSV of certificate registry with strict RFC 4180 escaping.
+     * Uses real certificate timestamps and dynamic FileProvider authority.
+     */
+    fun shareCsvRegistry(context: Context, certificates: List<Certificate>) {
         if (certificates.isEmpty()) {
             Toast.makeText(context, "No saved certificates in registry to export.", Toast.LENGTH_SHORT).show()
             return
         }
+
         try {
             val csvBuilder = StringBuilder()
-            csvBuilder.append("Roll No,Student Name,Father Name,Course,Issue Date,Grade,Timestamp,Cert Type,Session,Duration,Place Of Issue\n")
-            val timeStamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            val headers = listOf(
+                "Certificate ID",
+                "Roll No",
+                "Student Name",
+                "Father / Guardian",
+                "Course Name",
+                "Certificate Type",
+                "Session Range",
+                "Duration",
+                "Grade",
+                "Place Of Issue",
+                "Date Of Issue",
+                "Created Timestamp",
+                "Cloud Synced"
+            )
+            csvBuilder.append(headers.joinToString(",") { CertificateConfig.escapeCsv(it) }).append("\n")
+
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+
             certificates.forEach { cert ->
-                csvBuilder.append("\"${cert.rollNo}\",\"${cert.studentName}\",\"${cert.fatherName}\",\"${cert.courseName}\",\"${cert.dateOfIssue}\",\"${cert.grade}\",\"$timeStamp\",\"${cert.certType}\",\"${cert.sessionRange}\",\"${cert.duration}\",\"${cert.placeOfIssue}\"\n")
+                val timeStr = dateFormat.format(Date(cert.timestamp))
+                val row = listOf(
+                    cert.certificateId,
+                    cert.rollNo,
+                    cert.studentName,
+                    cert.fatherName,
+                    cert.courseName,
+                    cert.certType,
+                    cert.sessionRange,
+                    cert.duration,
+                    cert.grade,
+                    cert.placeOfIssue,
+                    cert.dateOfIssue,
+                    timeStr,
+                    if (cert.isSynced) "YES" else "NO"
+                )
+                csvBuilder.append(row.joinToString(",") { CertificateConfig.escapeCsv(it) }).append("\n")
             }
 
             val cachePath = File(context.cacheDir, "shared_reports")
             if (!cachePath.exists()) cachePath.mkdirs()
             val csvFile = File(cachePath, "LGES_Certificates_Registry.csv")
-            csvFile.writeText(csvBuilder.toString())
+            csvFile.writeText(csvBuilder.toString(), Charsets.UTF_8)
 
-            val contentUri = FileProvider.getUriForFile(
-                context,
-                "com.aistudio.lgesadmin.kypwzm.fileprovider",
-                csvFile
-            )
+            val authority = "${context.packageName}.fileprovider"
+            val contentUri = FileProvider.getUriForFile(context, authority, csvFile)
 
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/csv"
@@ -214,7 +291,10 @@ object Exporter {
                 putExtra(Intent.EXTRA_TEXT, "Attached is the CSV export of ${certificates.size} certificates from LGES Registry.")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(shareIntent, "Share Certificate Registry CSV via"))
+            val chooser = Intent.createChooser(shareIntent, "Share Certificate Registry CSV via").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "Failed to export CSV: ${e.localizedMessage}", Toast.LENGTH_LONG).show()

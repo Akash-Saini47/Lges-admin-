@@ -1,122 +1,286 @@
 /**
- * Google Apps Script - doPost Web App Endpoint (with API Key Protection)
+ * LGES Certificate Cloud Synchronization Engine
+ * Google Apps Script - Web App Endpoint (CRUD + Deduplication + API Key Protection)
  * 
  * Instructions to Deploy:
- * 1. Open Google Sheets and create a new blank spreadsheet.
- * 2. In the top menu, go to "Extensions" -> "Apps Script".
- * 3. Delete any default code in the editor and paste this code.
- * 4. (Optional Security) Set API_KEY below to a custom secret string (e.g. "MySecretKey123").
- *    If set, you must also enter this key in the Settings tab of the Android app.
- * 5. Save the script (disk icon).
- * 6. Click "Deploy" -> "New deployment" in the top-right.
- * 7. Under "Select type" (gear icon), choose "Web app".
- * 8. Set "Execute as" to: "Me (your-email@gmail.com)".
- * 9. Set "Who has access" to: "Anyone".
- * 10. Click "Deploy". Authorize any permissions requested.
- * 11. Copy the generated "Web app URL" (ends in "/exec") and paste it in the Setup tab of the Android app!
+ * 1. Open your Google Sheet for LGES Certificates.
+ * 2. Go to "Extensions" -> "Apps Script".
+ * 3. Replace all existing code with this updated script.
+ * 4. (Optional Security Key) Set API_KEY below to a secret passphrase.
+ *    If set, you must also save this key in the Settings tab of the Android app.
+ * 5. Save (disk icon).
+ * 6. Click "Deploy" -> "Manage deployments" -> Edit (pencil) -> New version -> "Deploy".
+ *    (Or "Deploy" -> "New deployment" -> Type: Web app, Execute as: "Me", Access: "Anyone").
+ * 7. Ensure Web App URL ends with "/exec" and copy it into the LGES Admin Android App.
  */
 
-// OPTIONAL SECURITY KEY (Shared Secret)
-// Set a secret key below to restrict access to authorized apps only.
-// If set, incoming POST requests must match this key in their JSON body ("apiKey": "YOUR_SECRET_KEY").
-// Leave as empty string "" if you do not wish to require an API Key.
-var API_KEY = "";
+var API_KEY = ""; // Set secret passphrase or leave blank ""
+var VERIFICATION_BASE_URL = "https://lges-computer-classes.netlify.app/verify.html";
+
+var HEADERS = [
+  "Upload Timestamp",       // Col 1 (A)
+  "Certificate ID",         // Col 2 (B)
+  "Roll No",                // Col 3 (C)
+  "Student Name",           // Col 4 (D)
+  "Father / Guardian Name", // Col 5 (E)
+  "Course / Internship",    // Col 6 (F)
+  "Certificate Type",       // Col 7 (G)
+  "Session / Date Range",   // Col 8 (H)
+  "Duration",               // Col 9 (I)
+  "Grade",                  // Col 10 (J)
+  "Place of Issue",         // Col 11 (K)
+  "Date of Issue",          // Col 12 (L)
+  "Verification Link"       // Col 13 (M)
+];
 
 function doPost(e) {
-  // Set CORS and return headers
-  var headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  };
-
   try {
-    // Check if post data is empty
     if (!e || !e.postData || !e.postData.contents) {
-      return ContentService.createTextOutput(JSON.stringify({
-        "status": "error",
-        "message": "Empty POST body or payload received."
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+      return jsonResponse({
+        status: "error",
+        message: "Invalid request: Empty payload received."
+      });
     }
 
-    // Parse the incoming JSON parameters sent from the Android Admin app
-    var data = JSON.parse(e.postData.contents);
+    var data;
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (parseErr) {
+      return jsonResponse({
+        status: "error",
+        message: "Malformed JSON payload."
+      });
+    }
 
-    // Security Check: Verify API Key if configured
+    // 1. Authenticate API Key if configured
     if (API_KEY && API_KEY.trim() !== "") {
-      if (!data.apiKey || data.apiKey !== API_KEY) {
-        return ContentService.createTextOutput(JSON.stringify({
-          "status": "error",
-          "message": "Unauthorized: Invalid or missing API Security Key."
-        }))
-        .setMimeType(ContentService.MimeType.JSON);
+      var clientKey = data.apiKey || "";
+      if (clientKey !== API_KEY) {
+        return jsonResponse({
+          status: "error",
+          message: "Unauthorized: Invalid or missing API Security Key."
+        });
       }
     }
-    
-    // Obtain the active spreadsheet and the primary sheet tab
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    
-    var timestamp = new Date();
-    var rollNo = data.rollNo || "";
-    var studentName = data.studentName || "";
-    var fatherName = data.fatherName || "";
-    var courseName = data.courseName || "";
-    var certType = data.certType || ""; // "Course" or "Internship"
-    var sessionRange = data.sessionRange || "";
-    var duration = data.duration || "";
-    var grade = data.grade || "";
-    var placeOfIssue = data.placeOfIssue || "";
-    var dateOfIssue = data.dateOfIssue || "";
 
-    // Data Validation Guard
-    if (!rollNo || !studentName) {
-      return ContentService.createTextOutput(JSON.stringify({
-        "status": "error",
-        "message": "Validation Error: Roll Number and Student Name are required fields."
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+    var action = (data.action || "save").toLowerCase().trim();
+    var sheet = getOrCreateSheet();
+
+    // 2. Handle DELETE action
+    if (action === "delete") {
+      var targetId = (data.certificateId || data.rollNo || "").trim();
+      if (!targetId) {
+        return jsonResponse({
+          status: "error",
+          message: "Delete failed: Certificate ID or Roll Number is required."
+        });
+      }
+
+      var rowIndex = findCertificateRow(sheet, targetId);
+      if (rowIndex > 0) {
+        sheet.deleteRow(rowIndex);
+        return jsonResponse({
+          status: "success",
+          action: "deleted",
+          certificateId: targetId,
+          message: "Certificate '" + targetId + "' deleted from cloud registry."
+        });
+      } else {
+        return jsonResponse({
+          status: "error",
+          message: "Certificate '" + targetId + "' not found in cloud registry."
+        });
+      }
     }
-    
-    // Construct the verification Netlify link
-    var verificationUrl = "https://lges-computer-classes.netlify.app/verify.html?certNo=" + encodeURIComponent(rollNo);
-    
-    // Append the values as a new row in the spreadsheet
-    sheet.appendRow([
-      timestamp,          // Column A: Date & Time of upload
-      rollNo,             // Column B: Roll No. / Certificate No.
-      studentName,        // Column C: Student Name
-      fatherName,         // Column D: Father's Name (Empty if Internship)
-      courseName,         // Column E: Course / Internship Title
-      certType,           // Column F: Certificate Type
-      sessionRange,       // Column G: Session / Date Range
-      duration,           // Column H: Duration
-      grade,              // Column I: Grade
-      placeOfIssue,       // Column J: Institute Address / Place of Issue
-      dateOfIssue,        // Column K: Date of Issue
-      verificationUrl     // Column L: Netlify Verification Link
-    ]);
-    
-    // Return successful JSON response
-    return ContentService.createTextOutput(JSON.stringify({
-      "status": "success",
-      "message": "Successfully synchronized certificate for student '" + studentName + "' to the cloud!",
-      "verificationUrl": verificationUrl
-    }))
-    .setMimeType(ContentService.MimeType.JSON);
-    
-  } catch (error) {
-    // Return error JSON response
-    return ContentService.createTextOutput(JSON.stringify({
-      "status": "error",
-      "message": "Script Error: " + error.toString()
-    }))
-    .setMimeType(ContentService.MimeType.JSON);
+
+    // 3. Handle PING / TEST action
+    if (action === "ping" || action === "test") {
+      return jsonResponse({
+        status: "success",
+        action: "ping",
+        message: "Connection verified! LGES Cloud Sync Web App is active."
+      });
+    }
+
+    // 4. Handle CREATE / UPDATE (Upsert)
+    var rollNo = (data.rollNo || data.regdNo || "").trim();
+    var certificateId = (data.certificateId || "").trim();
+    if (!certificateId && rollNo) {
+      certificateId = rollNo.toUpperCase().indexOf("LGES-") === 0 ? rollNo.toUpperCase() : ("LGES-" + rollNo);
+    }
+
+    var studentName = (data.studentName || data.name || "").trim();
+    var fatherName = (data.fatherName || "").trim();
+    var courseName = (data.courseName || data.course || "").trim();
+    var certType = (data.certType || "Course").trim();
+    var sessionRange = (data.sessionRange || "").trim();
+    var duration = (data.duration || "").trim();
+    var grade = (data.grade || "A").trim();
+    var placeOfIssue = (data.placeOfIssue || "").trim();
+    var dateOfIssue = (data.dateOfIssue || data.issueDate || "").trim();
+
+    // Server-side field validation
+    if (!certificateId || !rollNo) {
+      return jsonResponse({
+        status: "error",
+        message: "Validation Error: Certificate ID and Roll Number are required."
+      });
+    }
+    if (!studentName) {
+      return jsonResponse({
+        status: "error",
+        message: "Validation Error: Student Name is required."
+      });
+    }
+    if (!courseName) {
+      return jsonResponse({
+        status: "error",
+        message: "Validation Error: Course or Internship title is required."
+      });
+    }
+
+    var verificationUrl = VERIFICATION_BASE_URL + "?certNo=" + encodeURIComponent(certificateId);
+    var timestampStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT", "yyyy-MM-dd HH:mm:ss");
+
+    var rowValues = [
+      timestampStr,
+      certificateId,
+      rollNo,
+      studentName,
+      fatherName,
+      courseName,
+      certType,
+      sessionRange,
+      duration,
+      grade,
+      placeOfIssue,
+      dateOfIssue,
+      verificationUrl
+    ];
+
+    // Search for existing record by Certificate ID or Roll No
+    var existingRow = findCertificateRow(sheet, certificateId, rollNo);
+
+    if (existingRow > 0) {
+      // UPDATE existing row in place (prevent duplicates)
+      var range = sheet.getRange(existingRow, 1, 1, rowValues.length);
+      range.setValues([rowValues]);
+      return jsonResponse({
+        status: "success",
+        action: "updated",
+        certificateId: certificateId,
+        message: "Successfully updated cloud record for " + studentName + " (" + certificateId + ").",
+        verificationUrl: verificationUrl
+      });
+    } else {
+      // CREATE new row
+      sheet.appendRow(rowValues);
+      return jsonResponse({
+        status: "success",
+        action: "created",
+        certificateId: certificateId,
+        message: "Successfully synchronized new certificate for " + studentName + " (" + certificateId + ") to cloud!",
+        verificationUrl: verificationUrl
+      });
+    }
+
+  } catch (err) {
+    return jsonResponse({
+      status: "error",
+      message: "Server Execution Error: " + (err.message || err.toString())
+    });
   }
 }
 
-// Handle preflight OPTIONS requests gracefully
-function doOptions(e) {
-  return ContentService.createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT);
+function doGet(e) {
+  var certId = "";
+  if (e && e.parameter) {
+    certId = e.parameter.certNo || e.parameter.certificateId || e.parameter.rollNo || "";
+  }
+
+  if (!certId) {
+    return jsonResponse({
+      status: "success",
+      service: "LGES Certificate Sync API",
+      version: "2.0",
+      active: true
+    });
+  }
+
+  var sheet = getOrCreateSheet();
+  var row = findCertificateRow(sheet, certId);
+  if (row > 0) {
+    var data = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+    return jsonResponse({
+      status: "success",
+      action: "found",
+      certificate: {
+        timestamp: data[0],
+        certificateId: data[1],
+        rollNo: data[2],
+        studentName: data[3],
+        fatherName: data[4],
+        courseName: data[5],
+        certType: data[6],
+        sessionRange: data[7],
+        duration: data[8],
+        grade: data[9],
+        placeOfIssue: data[10],
+        dateOfIssue: data[11],
+        verificationUrl: data[12]
+      }
+    });
+  } else {
+    return jsonResponse({
+      status: "error",
+      message: "Certificate '" + certId + "' not found."
+    });
+  }
+}
+
+function findCertificateRow(sheet, certificateId, rollNo) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return -1; // Only header or empty
+
+  // Read columns B (Cert ID) and C (Roll No)
+  var certIdRange = sheet.getRange(2, 2, lastRow - 1, 2).getValues();
+  var targetCert = (certificateId || "").trim().toUpperCase();
+  var targetRoll = (rollNo || "").trim().toUpperCase();
+
+  for (var i = 0; i < certIdRange.length; i++) {
+    var rowCertId = (certIdRange[i][0] || "").toString().trim().toUpperCase();
+    var rowRollNo = (certIdRange[i][1] || "").toString().trim().toUpperCase();
+
+    if (targetCert && rowCertId === targetCert) {
+      return i + 2; // 1-indexed row number
+    }
+    if (targetRoll && rowRollNo === targetRoll) {
+      return i + 2;
+    }
+    // Backward compatibility for legacy sheets where Col B stored rollNo
+    if (targetRoll && rowCertId === targetRoll) {
+      return i + 2;
+    }
+  }
+  return -1;
+}
+
+function getOrCreateSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  if (!sheet) {
+    sheet = ss.insertSheet("Certificates");
+  }
+
+  // Ensure header row exists
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(HEADERS);
+    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight("bold").setBackground("#0B1B3D").setFontColor("#FFFFFF");
+  }
+  return sheet;
+}
+
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
