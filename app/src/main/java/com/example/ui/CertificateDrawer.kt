@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Paint.Align
 import android.graphics.Path
@@ -17,14 +18,19 @@ import com.example.database.Certificate
 /**
  * CertificateDrawer
  * ------------------------------------------------------------------
- * Renders the LGES certificate bitmap (2400 x 1600, landscape).
+ * Renders the authoritative LGES certificate bitmap (2400 x 1600, landscape 3:2).
  *
- * Refactored Features:
- *  1. Outer Golden Frame: Spans the entire canvas (from 40f to W-40f, 40f to H-40f),
- *     unifying both the left navy sidebar strip and right content area in a single double-border frame.
- *  2. Left Sidebar Curve: Smooth, symmetric Bezier outward sweep across the middle height.
- *  3. Asset & Vector Icons: Decodes R.drawable.img_lges_logo cleanly with a ContextCompat fallback,
- *     and draws sharp vector line-art icons for the details grid.
+ * Architecture:
+ *   Static Certificate Structure + Dynamic Certificate Data + Dynamic QR Code
+ *
+ * Strict Compliance:
+ *   - Absolute zero signature (no image, no line, no "Director Signature", clean blank background)
+ *   - Authentic circular LGES logo with ribbon placed directly on navy panel (no white box)
+ *   - Golden double-border with 4 corner flourishes
+ *   - Golden curved Bezier separator for left navy panel
+ *   - Golden details table with vector icons
+ *   - Centered session & performance grade row without parchment card
+ *   - Dynamic scannable QR code without extraneous text
  */
 data class CertificateData(
     val rollNo: String,
@@ -42,54 +48,51 @@ data class CertificateData(
 
 object CertificateDrawer {
 
-    // ---------------- canvas metrics ----------------
+    // ---------------- canvas metrics (2400 x 1600, 3:2 landscape) ----------------
     private const val W = 2400
     private const val H = 1600
 
     // ---------------- sidebar geometry ----------------
-    private const val SB_TOP_X = 660f       // curve top anchor
-    private const val SB_CP1_X = 820f       // top control point (outward sweep)
-    private const val SB_CP1_Y = H * 0.35f  // ~560f
-    private const val SB_CP2_X = 740f       // lower control point
-    private const val SB_CP2_Y = H * 0.65f  // ~1040f
-    private const val SB_END_X = 580f       // curve bottom anchor
-    private const val SB_CENTER = 330f      // horizontal centre for sidebar content
+    private const val SB_TOP_X = 640f       // curve top anchor
+    private const val SB_CP1_X = 810f       // top control point (outward sweep)
+    private const val SB_CP1_Y = 540f
+    private const val SB_CP2_X = 720f       // lower control point
+    private const val SB_CP2_Y = 1060f
+    private const val SB_END_X = 570f       // curve bottom anchor
+    private const val SB_CENTER = 310f      // horizontal centre for sidebar content
 
     // ---------------- body frame ----------------
-    private const val BODY_LEFT = 800f
+    private const val BODY_LEFT = 760f
     private const val BODY_RIGHT = 2320f
-    private const val BODY_CX = (BODY_LEFT + BODY_RIGHT) / 2f
+    private const val BODY_CX = 1530f
 
-    // ---------------- vertical rhythm (single source of truth) ------------
-    private const val Y_HEADER = 214f
-    private const val Y_HEADER_RULE = 260f
-    private const val Y_SUB_1 = 322f
-    private const val Y_SUB_2 = 368f
-    private const val Y_SUB_3 = 406f
-    private const val Y_ROLL = 462f
-    private const val Y_AWARDED = 512f
-    private const val Y_NAME = 606f
-    private const val Y_NAME_RULE = 648f
-    private const val Y_GUARDIAN = 704f
-    private const val Y_RECOGNITION = 764f
-    private const val Y_COURSE = 856f
-    private const val Y_INSTITUTION = 934f
-    private const val Y_BADGE_TOP = 972f
-    private const val BADGE_H = 92f
-    private const val Y_GRID_TOP = 1120f
-    private const val Y_GRID_BOTTOM = 1476f
-    private const val GRID_RIGHT = 1740f
-    private const val Y_SIGN_RULE = 1404f
+    // ---------------- vertical rhythm ----------------
+    private const val Y_HEADER = 210f
+    private const val Y_HEADER_RULE = 258f
+    private const val Y_SUB_1 = 320f
+    private const val Y_SUB_2 = 366f
+    private const val Y_SUB_3 = 404f
+    private const val Y_ROLL = 468f
+    private const val Y_AWARDED = 520f
+    private const val Y_NAME = 614f
+    private const val Y_NAME_RULE = 656f
+    private const val Y_GUARDIAN = 712f
+    private const val Y_RECOGNITION = 770f
+    private const val Y_COURSE = 862f
+    private const val Y_INSTITUTION = 938f
+    private const val Y_SESSION_ROW = 1018f
+    private const val Y_GRID_TOP = 1110f
+    private const val Y_GRID_BOTTOM = 1480f
+    private const val GRID_RIGHT = 1720f
 
-    // ---------------- palette ----------------
+    // ---------------- palette (exact match with reference) ----------------
     private const val NAVY = 0xFF0B1B3D.toInt()
-    private const val GOLD = 0xFFD4AF37.toInt()
-    private const val GOLD_SOFT = 0xFFC5A880.toInt()
-    private const val CREAM = 0xFFFAF6EC.toInt()
-    private const val PARCHMENT = 0xFFF3EBD8.toInt()
-    private const val MAROON = 0xFF990000.toInt()
-    private const val TEAL = 0xFF0F624C.toInt()
-    private const val INK = 0xFF1E1E1E.toInt()
+    private const val GOLD = 0xFFC89D3C.toInt()
+    private const val GOLD_LIGHT = 0xFFDFC07A.toInt()
+    private const val GOLD_DEEP = 0xFFB3832B.toInt()
+    private const val CREAM = 0xFFFAF9F5.toInt()
+    private const val MAROON = 0xFF800000.toInt()
+    private const val INK = 0xFF1E293B.toInt()
     private const val WHITE = 0xFFFFFFFF.toInt()
 
     // ---------------- typefaces ----------------
@@ -97,6 +100,7 @@ object CertificateDrawer {
     private val SERIF_BOLD = Typeface.create(Typeface.SERIF, Typeface.BOLD)
     private val SERIF_ITALIC = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
     private val SANS = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+    private val SANS_BOLD = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
 
     // ==================================================================
     // PUBLIC API
@@ -109,11 +113,11 @@ object CertificateDrawer {
             course = cert.courseName,
             session = cert.sessionRange,
             grade = cert.grade,
-            runBy = "LAKSHMI GROUP OF EDUCATION SOCIETY",
+            runBy = "Lakshmi Group of Education Society",
             duration = cert.duration,
             dateOfIssue = cert.dateOfIssue,
             placeOfIssue = cert.placeOfIssue,
-            website = com.example.util.CertificateConfig.DEFAULT_INSTITUTE_WEBSITE
+            website = "www.lges-computer-classes.netlify.app"
         )
         return draw(context, certData, qrBitmap)
     }
@@ -121,6 +125,8 @@ object CertificateDrawer {
     fun draw(context: Context, cert: CertificateData, qr: Bitmap? = null): Bitmap {
         val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
+
+        // 1. Pristine warm ivory background
         c.drawColor(CREAM)
 
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -133,23 +139,33 @@ object CertificateDrawer {
             strokeJoin = Paint.Join.ROUND
         }
 
-        // 1. Navy sidebar strip
+        // 2. Left navy sidebar strip with Bezier curve boundary
         drawSidebar(c, fill, line)
 
-        // 2. Sidebar logo & brand text
+        // 3. Sidebar logo & brand identity (drawn directly on navy background)
         drawSidebarBrand(c, context, fill, line)
 
-        // 3. Outer golden frame (spans entire canvas width & height)
-        drawOuterBorder(c, line)
+        // 4. Outer golden double frame with corner flourishes across full canvas
+        drawOuterBorder(c, line, fill)
 
-        // 4. Content area
+        // 5. Certificate Header (Maroon LGES, superscript TM, Navy CERTIFICATE, Subtitles)
         drawHeader(c, fill, line)
         drawSubtitle(c, fill)
+
+        // 6. Award Information (Roll No, Awardee Name, Guardian, Course, Society)
         drawAwardBlock(c, fill, line, cert)
-        drawBadgeBox(c, fill, line, cert)
+
+        // 7. Session & Performance Grade row
+        drawSessionGradeRow(c, fill, line, cert)
+
+        // 8. Certificate Information Table (Rounded golden card with vector icons)
         drawDetailsGrid(c, fill, line, cert)
+
+        // 9. Scannable Dynamic QR Code
         drawQr(c, fill, line, qr)
-        drawSignatureBlock(c, fill, line, cert)
+
+        // Note: Director signature block is COMPLETELY OMITTED as per strict mandate.
+        // The bottom-right area remains clean, blank certificate background.
 
         return bmp
     }
@@ -166,9 +182,9 @@ object CertificateDrawer {
     }
 
     // ==================================================================
-    // OUTER BORDER (Entire Canvas Frame)
+    // OUTER BORDER (Double Gold Frame + 4 Corner Flourishes)
     // ==================================================================
-    private fun drawOuterBorder(c: Canvas, line: Paint) {
+    private fun drawOuterBorder(c: Canvas, line: Paint, fill: Paint) {
         val l = 40f
         val t = 40f
         val r = W - 40f
@@ -176,38 +192,52 @@ object CertificateDrawer {
 
         // Outer primary gold border
         line.color = GOLD
-        line.strokeWidth = 4f
+        line.strokeWidth = 4.5f
         c.drawRect(l, t, r, b, line)
 
         // Inner soft gold border
-        line.color = GOLD_SOFT
+        val innerOffset = 16f
+        line.color = GOLD_LIGHT
         line.strokeWidth = 2f
-        c.drawRect(l + 14f, t + 14f, r - 14f, b - 14f, line)
+        c.drawRect(l + innerOffset, t + innerOffset, r - innerOffset, b - innerOffset, line)
 
-        // Corner accents
-        fun corner(x: Float, y: Float, sx: Int, sy: Int) {
-            val len = 60f
+        // Classical certificate corner flourishes
+        fun drawCornerFlourish(cx: Float, cy: Float, sx: Float, sy: Float) {
             line.color = GOLD
-            line.strokeWidth = 5f
-            c.drawLine(x, y + sy * len, x, y, line)
-            c.drawLine(x, y, x + sx * len, y, line)
+            line.strokeWidth = 3f
 
-            line.color = GOLD_SOFT
-            line.strokeWidth = 2f
-            c.drawLine(x + sx * 14f, y + sy * 14f + sy * len * 0.6f, x + sx * 14f, y + sy * 14f, line)
-            c.drawLine(x + sx * 14f, y + sy * 14f, x + sx * 14f + sx * len * 0.6f, y + sy * 14f, line)
+            val armLen = 70f
+            c.drawLine(cx, cy + sy * armLen, cx, cy, line)
+            c.drawLine(cx, cy, cx + sx * armLen, cy, line)
+
+            // Ornate scroll arc
+            val path = Path().apply {
+                moveTo(cx + sx * 22f, cy)
+                cubicTo(cx + sx * 22f, cy + sy * 22f, cx, cy + sy * 22f, cx, cy + sy * 22f)
+            }
+            c.drawPath(path, line)
+
+            // Inner fleuron dot
+            fill.color = GOLD_DEEP
+            c.drawCircle(cx + sx * 28f, cy + sy * 28f, 5f, fill)
         }
-        corner(l, t, 1, 1)
-        corner(r, t, -1, 1)
-        corner(l, b, 1, -1)
-        corner(r, b, -1, -1)
+
+        val il = l + innerOffset
+        val it = t + innerOffset
+        val ir = r - innerOffset
+        val ib = b - innerOffset
+
+        drawCornerFlourish(il, it, 1f, 1f)
+        drawCornerFlourish(ir, it, -1f, 1f)
+        drawCornerFlourish(il, ib, 1f, -1f)
+        drawCornerFlourish(ir, ib, -1f, -1f)
     }
 
     // ==================================================================
     // SIDEBAR & BEZIER CURVE
     // ==================================================================
     private fun drawSidebar(c: Canvas, fill: Paint, line: Paint) {
-        // Filled navy background with smooth outward Bezier curve on the right
+        // Deep navy filled background with graceful Bezier curve
         val sidebarPath = Path().apply {
             moveTo(0f, 0f)
             lineTo(SB_TOP_X, 0f)
@@ -218,190 +248,195 @@ object CertificateDrawer {
         fill.color = NAVY
         c.drawPath(sidebarPath, fill)
 
-        // Gold Bezier curve borders
+        // Outer gold Bezier curve border
         val goldCurvePath = Path().apply {
             moveTo(SB_TOP_X, 0f)
             cubicTo(SB_CP1_X, SB_CP1_Y, SB_CP2_X, SB_CP2_Y, SB_END_X, H.toFloat())
         }
         line.color = GOLD
-        line.strokeWidth = 6f
+        line.strokeWidth = 5.5f
         c.drawPath(goldCurvePath, line)
 
-        // Inner soft gold accent curve
+        // Parallel inner soft gold curve
         val goldInnerPath = Path().apply {
-            moveTo(SB_TOP_X - 16f, 0f)
-            cubicTo(SB_CP1_X - 16f, SB_CP1_Y, SB_CP2_X - 16f, SB_CP2_Y, SB_END_X - 16f, H.toFloat())
+            moveTo(SB_TOP_X - 14f, 0f)
+            cubicTo(SB_CP1_X - 14f, SB_CP1_Y, SB_CP2_X - 14f, SB_CP2_Y, SB_END_X - 14f, H.toFloat())
         }
-        line.color = GOLD_SOFT
-        line.strokeWidth = 3f
+        line.color = GOLD_LIGHT
+        line.strokeWidth = 2.5f
         c.drawPath(goldInnerPath, line)
     }
 
-    /** Logo card + logo drawable + wordmark + motto, all inside the navy sidebar. */
+    /**
+     * Sidebar Brand Identity:
+     * - Circular LGES emblem logo with ribbon drawn directly on navy background (NO white card)
+     * - Large gold "LGES" wordmark
+     * - Gold ornamental divider line with center diamond
+     * - Gold italic motto
+     */
     private fun drawSidebarBrand(c: Canvas, context: Context, fill: Paint, line: Paint) {
-        val cardW = 360f
-        val cardH = 360f
-        val card = RectF(
-            SB_CENTER - cardW / 2f, 180f,
-            SB_CENTER + cardW / 2f, 180f + cardH
+        val logoSize = 360f
+        val logoTop = 160f
+        val logoRect = RectF(
+            SB_CENTER - logoSize / 2f,
+            logoTop,
+            SB_CENTER + logoSize / 2f,
+            logoTop + logoSize
         )
 
-        fill.color = WHITE
-        c.drawRoundRect(card, 40f, 40f, fill)
-        line.color = GOLD
-        line.strokeWidth = 4f
-        c.drawRoundRect(card, 40f, 40f, line)
-
-        val inset = 30f
-        val drawBounds = Rect(
-            (card.left + inset).toInt(),
-            (card.top + inset).toInt(),
-            (card.right - inset).toInt(),
-            (card.bottom - inset).toInt()
-        )
-
-        val drawable = try {
-            ContextCompat.getDrawable(context, R.drawable.img_lges_logo)
-        } catch (t: Throwable) {
-            null
-        }
-
-        if (drawable != null) {
-            drawable.setBounds(drawBounds)
-            drawable.draw(c)
+        // Load and draw the official circular LGES logo
+        val logoBitmap = loadLogoBitmap(context)
+        if (logoBitmap != null) {
+            val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            c.drawBitmap(logoBitmap, null, logoRect, bmpPaint)
         } else {
-            drawLogoFallback(c, fill, line, card)
+            drawFallbackLogo(c, fill, line, logoRect)
         }
 
-        // wordmark
+        // Wordmark: LGES in bold gold serif
         fill.color = GOLD
         fill.typeface = SERIF_BOLD
-        fill.textSize = 140f
+        fill.textSize = 135f
         fill.textAlign = Align.CENTER
-        c.drawText("LGES", SB_CENTER, card.bottom + 170f, fill)
+        c.drawText("LGES", SB_CENTER, logoRect.bottom + 155f, fill)
 
-        // dotted rule
-        val ruleY = card.bottom + 220f
-        line.color = GOLD_SOFT
-        line.strokeWidth = 3f
-        c.drawLine(SB_CENTER - 150f, ruleY, SB_CENTER - 20f, ruleY, line)
-        c.drawLine(SB_CENTER + 20f, ruleY, SB_CENTER + 150f, ruleY, line)
+        // Ornamental gold divider line with center diamond
+        val ruleY = logoRect.bottom + 198f
+        line.color = GOLD_LIGHT
+        line.strokeWidth = 2.5f
+        c.drawLine(SB_CENTER - 140f, ruleY, SB_CENTER - 18f, ruleY, line)
+        c.drawLine(SB_CENTER + 18f, ruleY, SB_CENTER + 140f, ruleY, line)
+
         fill.color = GOLD
-        c.drawCircle(SB_CENTER, ruleY, 6f, fill)
+        val diamond = Path().apply {
+            moveTo(SB_CENTER, ruleY - 8f)
+            lineTo(SB_CENTER + 10f, ruleY)
+            lineTo(SB_CENTER, ruleY + 8f)
+            lineTo(SB_CENTER - 10f, ruleY)
+            close()
+        }
+        c.drawPath(diamond, fill)
 
-        // motto
+        // Motto
         fill.typeface = SERIF_ITALIC
-        fill.color = GOLD_SOFT
-        fill.textSize = 36f
-        c.drawText("Empowering Learners,", SB_CENTER, ruleY + 90f, fill)
-        c.drawText("Enriching Futures.", SB_CENTER, ruleY + 140f, fill)
+        fill.color = GOLD_LIGHT
+        fill.textSize = 34f
+        c.drawText("Empowering Learners,", SB_CENTER, ruleY + 75f, fill)
+        c.drawText("Enriching Futures.", SB_CENTER, ruleY + 120f, fill)
     }
 
-    /** Decodes logo resource (vector or raster) safely into a Bitmap. */
-    private fun loadLogo(context: Context): Bitmap? = try {
-        val drawable = ContextCompat.getDrawable(context, R.drawable.img_lges_logo)
-        if (drawable != null) {
-            val w = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 512
-            val h = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 512
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            drawable.setBounds(0, 0, w, h)
-            drawable.draw(canvas)
-            bitmap
-        } else {
+    private fun loadLogoBitmap(context: Context): Bitmap? {
+        return try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.img_lges_logo)
+                ?: run {
+                    val d = ContextCompat.getDrawable(context, R.drawable.img_lges_logo) ?: return null
+                    val w = if (d.intrinsicWidth > 0) d.intrinsicWidth else 512
+                    val h = if (d.intrinsicHeight > 0) d.intrinsicHeight else 512
+                    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(bmp)
+                    d.setBounds(0, 0, w, h)
+                    d.draw(canvas)
+                    bmp
+                }
+        } catch (_: Throwable) {
             null
         }
-    } catch (t: Throwable) {
-        null
     }
 
-    /** Draws [logo] centred inside [target], preserving its aspect ratio. */
-    private fun drawLogoWithAspectRatio(
-        c: Canvas,
-        logo: Bitmap,
-        target: RectF,
-        inset: Float,
-    ) {
-        if (logo.width <= 0 || logo.height <= 0) return
-        val availW = target.width() - inset * 2f
-        val availH = target.height() - inset * 2f
-        if (availW <= 0f || availH <= 0f) return
-
-        val scale = minOf(availW / logo.width, availH / logo.height)
-        val dw = logo.width * scale
-        val dh = logo.height * scale
-        val dst = RectF(
-            target.centerX() - dw / 2f,
-            target.centerY() - dh / 2f,
-            target.centerX() + dw / 2f,
-            target.centerY() + dh / 2f
-        )
-
-        val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        c.drawBitmap(logo, null, dst, bitmapPaint)
-    }
-
-    /** Vector monogram fallback if logo resource cannot be decoded. */
-    private fun drawLogoFallback(c: Canvas, fill: Paint, line: Paint, card: RectF) {
-        val cx = card.centerX()
-        val cy = card.centerY()
-        line.color = NAVY
-        line.strokeWidth = 6f
-        c.drawCircle(cx, cy, card.width() * 0.33f, line)
+    private fun drawFallbackLogo(c: Canvas, fill: Paint, line: Paint, rect: RectF) {
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val r = rect.width() / 2f
         line.color = GOLD
+        line.strokeWidth = 6f
+        c.drawCircle(cx, cy, r - 6f, line)
+        line.color = GOLD_LIGHT
         line.strokeWidth = 3f
-        c.drawCircle(cx, cy, card.width() * 0.27f, line)
+        c.drawCircle(cx, cy, r - 18f, line)
 
-        fill.color = NAVY
+        fill.color = GOLD
         fill.typeface = SERIF_BOLD
+        fill.textSize = 90f
         fill.textAlign = Align.CENTER
-        fill.textSize = 110f
-        c.drawText("LG", cx, cy + 38f, fill)
+        c.drawText("LGES", cx, cy + 30f, fill)
     }
 
     // ==================================================================
     // HEADER
     // ==================================================================
     private fun drawHeader(c: Canvas, fill: Paint, line: Paint) {
-        val big = 132f
-        val tm = 36f
-        fill.typeface = SERIF_BOLD
-        fill.textAlign = Align.LEFT
+        val titleSize = 126f
+        val tmSize = 34f
 
-        fill.textSize = big
+        fill.typeface = SERIF_BOLD
+        fill.textSize = titleSize
         val lgesW = fill.measureText("LGES")
         val certW = fill.measureText("CERTIFICATE")
-        fill.textSize = tm
+
+        fill.textSize = tmSize
         val tmW = fill.measureText("TM")
 
-        val gap = 44f
-        val startX = BODY_CX - (lgesW + tmW + gap + certW) / 2f
+        val gap = 42f
+        val totalW = lgesW + tmW + gap + certW
+        val startX = BODY_CX - totalW / 2f
 
+        // "LGES" in Maroon
         fill.color = MAROON
-        fill.textSize = big
+        fill.textSize = titleSize
+        fill.textAlign = Align.LEFT
         c.drawText("LGES", startX, Y_HEADER, fill)
 
-        fill.textSize = tm
-        c.drawText("TM", startX + lgesW + 8f, Y_HEADER - big * 0.62f, fill)
+        // "TM" superscript above "ES"
+        fill.textSize = tmSize
+        c.drawText("TM", startX + lgesW + 4f, Y_HEADER - titleSize * 0.60f, fill)
 
+        // "CERTIFICATE" in Navy
         fill.color = NAVY
-        fill.textSize = big
+        fill.textSize = titleSize
         c.drawText("CERTIFICATE", startX + lgesW + tmW + gap, Y_HEADER, fill)
 
-        drawFlourishRule(c, fill, line, BODY_CX, Y_HEADER_RULE, 250f)
+        // Symmetrical Gold Flourish Divider below Title
+        drawHeaderFlourishRule(c, fill, line, BODY_CX, Y_HEADER_RULE, 280f)
+    }
+
+    private fun drawHeaderFlourishRule(c: Canvas, fill: Paint, line: Paint, cx: Float, y: Float, halfWidth: Float) {
+        line.color = GOLD
+        line.strokeWidth = 2.5f
+
+        // Flanking lines
+        c.drawLine(cx - halfWidth, y, cx - 44f, y, line)
+        c.drawLine(cx + 44f, y, cx + halfWidth, y, line)
+
+        // Center ornate diamond
+        fill.color = GOLD
+        val diamond = Path().apply {
+            moveTo(cx, y - 14f)
+            lineTo(cx + 18f, y)
+            lineTo(cx, y + 14f)
+            lineTo(cx - 18f, y)
+            close()
+        }
+        c.drawPath(diamond, fill)
+
+        // Decorative satellite beads
+        fill.color = GOLD_LIGHT
+        c.drawCircle(cx - 30f, y, 4f, fill)
+        c.drawCircle(cx + 30f, y, 4f, fill)
     }
 
     private fun drawSubtitle(c: Canvas, fill: Paint) {
         fill.textAlign = Align.CENTER
         fill.color = NAVY
 
-        fill.typeface = SERIF_ITALIC
-        fill.textSize = 30f
+        fill.typeface = SANS_BOLD
+        fill.textSize = 29f
         c.drawText("(A NATIONAL COMPUTER LITERACY PROGRAMME)", BODY_CX, Y_SUB_1, fill)
 
         fill.typeface = SERIF
         fill.textSize = 26f
         c.drawText("An Autonomous Institution Registered Under the Society & C.R. Act", BODY_CX, Y_SUB_2, fill)
+
+        fill.textSize = 25f
         c.drawText("Ministry of HRD, Govt. of India, NCT, New Delhi", BODY_CX, Y_SUB_3, fill)
     }
 
@@ -409,25 +444,51 @@ object CertificateDrawer {
     // AWARD BLOCK
     // ==================================================================
     private fun drawAwardBlock(c: Canvas, fill: Paint, line: Paint, cert: CertificateData) {
+        // Roll No. on the left side
         fill.color = NAVY
         fill.typeface = SERIF_BOLD
         fill.textSize = 28f
         fill.textAlign = Align.LEFT
-        c.drawText("Roll No.: ${cert.rollNo}", BODY_LEFT + 20f, Y_ROLL, fill)
+        val rollLabel = "Roll No.: "
+        val rollLabelW = fill.measureText(rollLabel)
+        c.drawText(rollLabel, BODY_LEFT, Y_ROLL, fill)
 
-        fill.textAlign = Align.CENTER
         fill.typeface = SERIF
-        fill.textSize = 40f
+        c.drawText(cert.rollNo, BODY_LEFT + rollLabelW, Y_ROLL, fill)
+        val rollValW = fill.measureText(cert.rollNo).coerceAtLeast(180f)
+        line.color = GOLD_LIGHT
+        line.strokeWidth = 2f
+        c.drawLine(BODY_LEFT + rollLabelW, Y_ROLL + 6f, BODY_LEFT + rollLabelW + rollValW, Y_ROLL + 6f, line)
+
+        // "This certificate is awarded to"
+        fill.textAlign = Align.CENTER
+        fill.typeface = SERIF_ITALIC
+        fill.textSize = 38f
         c.drawText("This certificate is awarded to", BODY_CX, Y_AWARDED, fill)
 
-        fill.typeface = SERIF_ITALIC
-        fitTextSize(fill, cert.studentName, 900f, 92f, 40f)
+        // Student Name in stately navy serif
+        fill.typeface = SERIF_BOLD
+        fill.color = NAVY
+        fitTextSize(fill, cert.studentName, 1000f, 90f, 40f)
         c.drawText(cert.studentName, BODY_CX, Y_NAME, fill)
 
+        // Ornamental gold accent line under Student Name with central diamond
+        val ruleHalf = 420f
         line.color = GOLD
-        line.strokeWidth = 3f
-        c.drawLine(BODY_CX - 380f, Y_NAME_RULE, BODY_CX + 380f, Y_NAME_RULE, line)
+        line.strokeWidth = 2.5f
+        c.drawLine(BODY_CX - ruleHalf, Y_NAME_RULE, BODY_CX - 18f, Y_NAME_RULE, line)
+        c.drawLine(BODY_CX + 18f, Y_NAME_RULE, BODY_CX + ruleHalf, Y_NAME_RULE, line)
+        fill.color = GOLD
+        val nameDiamond = Path().apply {
+            moveTo(BODY_CX, Y_NAME_RULE - 7f)
+            lineTo(BODY_CX + 8f, Y_NAME_RULE)
+            lineTo(BODY_CX, Y_NAME_RULE + 7f)
+            lineTo(BODY_CX - 8f, Y_NAME_RULE)
+            close()
+        }
+        c.drawPath(nameDiamond, fill)
 
+        // Guardian Line (D/O or S/O ...)
         fill.typeface = SERIF_ITALIC
         fill.textSize = 32f
         val guardianText = when {
@@ -439,114 +500,98 @@ object CertificateDrawer {
         }
         if (guardianText.isNotBlank()) {
             c.drawText(guardianText, BODY_CX, Y_GUARDIAN, fill)
+            val gW = fill.measureText(guardianText)
+            line.color = GOLD_LIGHT
+            line.strokeWidth = 1.5f
+            c.drawLine(BODY_CX - gW / 2f, Y_GUARDIAN + 6f, BODY_CX + gW / 2f, Y_GUARDIAN + 6f, line)
         }
 
+        // Recognition Subtitle
         fill.typeface = SERIF
-        fill.textSize = 36f
+        fill.textSize = 34f
         c.drawText("In recognition of successful completion of", BODY_CX, Y_RECOGNITION, fill)
 
-        // course title with flourishes flanking it
+        // Course Title flanked by symmetrical gold flourishes
         fill.color = NAVY
         fill.typeface = SERIF_BOLD
-        fitTextSize(fill, cert.course, 1120f, 80f, 32f)
+        fitTextSize(fill, cert.course, 1100f, 78f, 32f)
         val courseW = fill.measureText(cert.course)
         c.drawText(cert.course, BODY_CX, Y_COURSE, fill)
 
-        val flourishY = Y_COURSE - 22f
-        drawFlourish(c, line, BODY_CX - courseW / 2f - 58f, flourishY, -1)
-        drawFlourish(c, line, BODY_CX + courseW / 2f + 58f, flourishY, 1)
+        val flourishY = Y_COURSE - 20f
+        drawCourseFlourish(c, line, BODY_CX - courseW / 2f - 60f, flourishY, -1)
+        drawCourseFlourish(c, line, BODY_CX + courseW / 2f + 60f, flourishY, 1)
 
-        // teal institution line flanked by short gold rules
-        fill.color = TEAL
+        // Institution Endorsement
+        fill.color = NAVY
         fill.typeface = SERIF_BOLD
         fill.textSize = 30f
-        val instTxt = "AT LAKSHMI GROUP OF EDUCATION SOCIETY"
-        val instW = fill.measureText(instTxt)
-        c.drawText(instTxt, BODY_CX, Y_INSTITUTION, fill)
+        val instText = "AT LAKSHMI GROUP OF EDUCATION SOCIETY"
+        val instW = fill.measureText(instText)
+        c.drawText(instText, BODY_CX, Y_INSTITUTION, fill)
 
         line.color = GOLD
-        line.strokeWidth = 2f
-        val ruleY = Y_INSTITUTION - 10f
-        c.drawLine(BODY_CX - instW / 2f - 150f, ruleY, BODY_CX - instW / 2f - 34f, ruleY, line)
-        c.drawLine(BODY_CX + instW / 2f + 34f, ruleY, BODY_CX + instW / 2f + 150f, ruleY, line)
+        line.strokeWidth = 2.5f
+        val dashY = Y_INSTITUTION - 9f
+        c.drawLine(BODY_CX - instW / 2f - 140f, dashY, BODY_CX - instW / 2f - 30f, dashY, line)
+        c.drawLine(BODY_CX + instW / 2f + 30f, dashY, BODY_CX + instW / 2f + 140f, dashY, line)
     }
 
-    /** Small symmetrical vector flourish (swash + leaf). dir = -1 left, +1 right. */
-    private fun drawFlourish(c: Canvas, line: Paint, x: Float, y: Float, dir: Int) {
+    /** Symmetrical vector flourish flanking the course name. dir = -1 left, +1 right. */
+    private fun drawCourseFlourish(c: Canvas, line: Paint, x: Float, y: Float, dir: Int) {
         line.color = GOLD
         line.strokeWidth = 3f
         val d = dir.toFloat()
 
         val swash = Path().apply {
             moveTo(x + d * 4f, y)
-            cubicTo(x + d * 30f, y - 24f, x + d * 56f, y - 16f, x + d * 64f, y + 4f)
-            cubicTo(x + d * 56f, y + 22f, x + d * 30f, y + 20f, x + d * 12f, y + 6f)
+            cubicTo(x + d * 30f, y - 22f, x + d * 56f, y - 14f, x + d * 64f, y + 4f)
+            cubicTo(x + d * 56f, y + 20f, x + d * 30f, y + 18f, x + d * 12f, y + 6f)
         }
         c.drawPath(swash, line)
 
         val leaf = Path().apply {
-            moveTo(x + d * 6f, y + 26f)
-            quadTo(x + d * 32f, y + 16f, x + d * 52f, y + 32f)
-            quadTo(x + d * 30f, y + 42f, x + d * 6f, y + 26f)
+            moveTo(x + d * 6f, y + 24f)
+            quadTo(x + d * 32f, y + 14f, x + d * 52f, y + 30f)
+            quadTo(x + d * 30f, y + 40f, x + d * 6f, y + 24f)
             close()
         }
         c.drawPath(leaf, line)
     }
 
-    /** Long divider: rule — ornament — rule. */
-    private fun drawFlourishRule(c: Canvas, fill: Paint, line: Paint, cx: Float, y: Float, half: Float) {
-        line.color = GOLD
-        line.strokeWidth = 2f
-        c.drawLine(cx - half, y, cx - 40f, y, line)
-        c.drawLine(cx + 40f, y, cx + half, y, line)
-
-        line.strokeWidth = 3f
-        val diamond = Path().apply {
-            moveTo(cx, y - 14f)
-            quadTo(cx + 16f, y, cx, y + 14f)
-            quadTo(cx - 16f, y, cx, y - 14f)
-            close()
-        }
-        c.drawPath(diamond, line)
-
-        fill.color = GOLD
-        c.drawCircle(cx - 30f, y, 4f, fill)
-        c.drawCircle(cx + 30f, y, 4f, fill)
-    }
-
     // ==================================================================
-    // SESSION / GRADE BADGE BOX
+    // SESSION & GRADE ROW (clean, no parchment box)
     // ==================================================================
-    private fun drawBadgeBox(c: Canvas, fill: Paint, line: Paint, cert: CertificateData) {
-        val boxW = 1080f
-        val box = RectF(BODY_CX - boxW / 2f, Y_BADGE_TOP, BODY_CX + boxW / 2f, Y_BADGE_TOP + BADGE_H)
+    private fun drawSessionGradeRow(c: Canvas, fill: Paint, line: Paint, cert: CertificateData) {
+        val y = Y_SESSION_ROW
+        val midX = BODY_CX
 
-        fill.color = PARCHMENT
-        c.drawRoundRect(box, 18f, 18f, fill)
-        line.color = GOLD
-        line.strokeWidth = 3f
-        c.drawRoundRect(box, 18f, 18f, line)
-
-        val midY = box.centerY()
-
-        drawCalendarIcon(c, fill, line, box.left + 60f, midY, 24f, NAVY)
-        fill.color = NAVY
+        // Left half: [Calendar Icon] Session: ...
+        val sessionText = "Session: ${cert.session}"
         fill.typeface = SERIF_BOLD
         fill.textSize = 30f
-        fill.textAlign = Align.LEFT
-        c.drawText("Session: ${cert.session}", box.left + 104f, midY + 11f, fill)
-
-        line.color = GOLD_SOFT
-        line.strokeWidth = 2f
-        c.drawLine(box.centerX(), box.top + 16f, box.centerX(), box.bottom - 16f, line)
-
-        drawStarIcon(c, fill, box.centerX() + 60f, midY, 24f, GOLD)
         fill.color = NAVY
-        c.drawText("Performance Grade: ${cert.grade}", box.centerX() + 104f, midY + 11f, fill)
+        fill.textAlign = Align.LEFT
+        val sessionW = fill.measureText(sessionText)
+
+        val sessionBlockLeft = midX - sessionW - 80f
+        drawCalendarIcon(c, fill, line, sessionBlockLeft + 15f, y - 8f, 22f, GOLD)
+        c.drawText(sessionText, sessionBlockLeft + 52f, y, fill)
+
+        // Center vertical divider rule
+        line.color = GOLD_LIGHT
+        line.strokeWidth = 2f
+        c.drawLine(midX, y - 30f, midX, y + 10f, line)
+
+        // Right half: [Star Icon] Performance Grade: ...
+        val gradeText = "Performance Grade: ${cert.grade}"
+        val gradeBlockLeft = midX + 35f
+        drawStarIcon(c, fill, gradeBlockLeft + 15f, y - 8f, 22f, GOLD)
+        c.drawText(gradeText, gradeBlockLeft + 52f, y, fill)
     }
 
     // ==================================================================
-    // DETAILS GRID (bottom-left of the body)
+    // DETAILS TABLE (5-row card with golden border and vector icons)
     // ==================================================================
     private fun drawDetailsGrid(c: Canvas, fill: Paint, line: Paint, cert: CertificateData) {
         val gx1 = BODY_LEFT
@@ -554,74 +599,79 @@ object CertificateDrawer {
         val gy1 = Y_GRID_TOP
         val gy2 = Y_GRID_BOTTOM
 
-        line.color = TEAL
+        val cardRect = RectF(gx1, gy1, gx2, gy2)
+
+        // Card border in warm Gold with rounded corners
+        line.color = GOLD
         line.strokeWidth = 3f
-        c.drawRect(gx1, gy1, gx2, gy2, line)
+        c.drawRoundRect(cardRect, 16f, 16f, line)
 
         val rows = listOf(
-            Triple(Icon.USER, "Run By", cert.runBy),
-            Triple(Icon.CLOCK, "Course Duration", cert.duration),
-            Triple(Icon.CALENDAR, "Date of Issue", cert.dateOfIssue),
-            Triple(Icon.PIN, "Place of Issue", cert.placeOfIssue),
-            Triple(Icon.GLOBE, "Website", cert.website),
+            Triple(IconKind.USER, "Run By", cert.runBy),
+            Triple(IconKind.CLOCK, "Course Duration", cert.duration),
+            Triple(IconKind.CALENDAR, "Date of Issue", cert.dateOfIssue),
+            Triple(IconKind.PIN, "Place of Issue", cert.placeOfIssue),
+            Triple(IconKind.GLOBE, "Website", cert.website),
         )
 
         val rowH = (gy2 - gy1) / rows.size
-        val iconColRight = gx1 + 92f          // icon cell: gx1 .. gx1+92
-        val labelColRight = gx1 + 430f        // label cell
+        val iconColRight = gx1 + 78f
+        val labelColRight = gx1 + 400f
+        val colonX = gx1 + 418f
+        val valueX = gx1 + 448f
         val iconCx = (gx1 + iconColRight) / 2f
-        val iconR = minOf(22f, rowH * 0.28f)
+        val iconR = 20f
 
         for ((i, row) in rows.withIndex()) {
             val top = gy1 + i * rowH
             val midY = top + rowH / 2f
 
+            // Horizontal row divider
             if (i > 0) {
-                line.color = TEAL
-                line.strokeWidth = 2f
+                line.color = GOLD_LIGHT
+                line.strokeWidth = 1.5f
                 c.drawLine(gx1, top, gx2, top, line)
             }
-            line.color = TEAL
-            line.strokeWidth = 2f
-            c.drawLine(iconColRight, top, iconColRight, top + rowH, line)
-            c.drawLine(labelColRight, top, labelColRight, top + rowH, line)
 
+            // Draw clean line icon
             drawRowIcon(c, fill, line, row.first, iconCx, midY, iconR)
 
+            // Label
             fill.color = INK
             fill.typeface = SERIF_BOLD
             fill.textAlign = Align.LEFT
-            fill.textSize = 30f
-            c.drawText(row.second, iconColRight + 26f, midY + 11f, fill)
+            fill.textSize = 28f
+            c.drawText(row.second, iconColRight + 18f, midY + 10f, fill)
 
+            // Colon separator
             fill.typeface = SERIF
-            fill.textSize = 30f
-            c.drawText(":", labelColRight + 18f, midY + 11f, fill)
+            c.drawText(":", colonX, midY + 10f, fill)
 
-            val valueX = labelColRight + 50f
-            fitTextSize(fill, row.third, gx2 - valueX - 24f, 30f, 18f)
-            c.drawText(row.third, valueX, midY + 11f, fill)
+            // Value text
+            fitTextSize(fill, row.third, gx2 - valueX - 20f, 28f, 18f)
+            c.drawText(row.third, valueX, midY + 10f, fill)
         }
     }
 
     // ==================================================================
     // VECTOR ICONS
     // ==================================================================
-    private enum class Icon { USER, CLOCK, CALENDAR, PIN, GLOBE }
+    private enum class IconKind { USER, CLOCK, CALENDAR, PIN, GLOBE }
 
-    private fun drawRowIcon(c: Canvas, fill: Paint, line: Paint, kind: Icon, cx: Float, cy: Float, r: Float) {
+    private fun drawRowIcon(c: Canvas, fill: Paint, line: Paint, kind: IconKind, cx: Float, cy: Float, r: Float) {
+        val iconColor = NAVY
         when (kind) {
-            Icon.USER -> drawUserIcon(c, line, cx, cy, r, TEAL)
-            Icon.CLOCK -> drawClockIcon(c, line, cx, cy, r, TEAL)
-            Icon.CALENDAR -> drawCalendarIcon(c, fill, line, cx, cy, r, TEAL)
-            Icon.PIN -> drawPinIcon(c, line, cx, cy, r, TEAL)
-            Icon.GLOBE -> drawGlobeIcon(c, line, cx, cy, r, TEAL)
+            IconKind.USER -> drawUserIcon(c, line, cx, cy, r, iconColor)
+            IconKind.CLOCK -> drawClockIcon(c, line, cx, cy, r, iconColor)
+            IconKind.CALENDAR -> drawCalendarIcon(c, fill, line, cx, cy, r, iconColor)
+            IconKind.PIN -> drawPinIcon(c, line, cx, cy, r, iconColor)
+            IconKind.GLOBE -> drawGlobeIcon(c, line, cx, cy, r, iconColor)
         }
     }
 
     private fun drawUserIcon(c: Canvas, line: Paint, cx: Float, cy: Float, r: Float, color: Int) {
         line.color = color
-        line.strokeWidth = 3f
+        line.strokeWidth = 2.5f
         c.drawCircle(cx, cy - r * 0.35f, r * 0.35f, line)
         val shoulders = RectF(cx - r * 0.70f, cy + r * 0.05f, cx + r * 0.70f, cy + r * 1.05f)
         c.drawArc(shoulders, 180f, 180f, false, line)
@@ -629,7 +679,7 @@ object CertificateDrawer {
 
     private fun drawClockIcon(c: Canvas, line: Paint, cx: Float, cy: Float, r: Float, color: Int) {
         line.color = color
-        line.strokeWidth = 3f
+        line.strokeWidth = 2.5f
         c.drawCircle(cx, cy, r * 0.85f, line)
         c.drawLine(cx, cy, cx, cy - r * 0.45f, line)
         c.drawLine(cx, cy, cx + r * 0.40f, cy + r * 0.15f, line)
@@ -637,7 +687,7 @@ object CertificateDrawer {
 
     private fun drawCalendarIcon(c: Canvas, fill: Paint, line: Paint, cx: Float, cy: Float, r: Float, color: Int) {
         line.color = color
-        line.strokeWidth = 3f
+        line.strokeWidth = 2.5f
         val body = RectF(cx - r * 0.75f, cy - r * 0.55f, cx + r * 0.75f, cy + r * 0.85f)
         c.drawRoundRect(body, 4f, 4f, line)
         c.drawLine(body.left, cy - r * 0.18f, body.right, cy - r * 0.18f, line)
@@ -651,7 +701,7 @@ object CertificateDrawer {
 
     private fun drawPinIcon(c: Canvas, line: Paint, cx: Float, cy: Float, r: Float, color: Int) {
         line.color = color
-        line.strokeWidth = 3f
+        line.strokeWidth = 2.5f
         val p = Path().apply {
             moveTo(cx, cy + r * 0.90f)
             cubicTo(cx - r * 0.85f, cy - r * 0.10f, cx - r * 0.60f, cy - r * 0.90f, cx, cy - r * 0.85f)
@@ -664,7 +714,7 @@ object CertificateDrawer {
 
     private fun drawGlobeIcon(c: Canvas, line: Paint, cx: Float, cy: Float, r: Float, color: Int) {
         line.color = color
-        line.strokeWidth = 3f
+        line.strokeWidth = 2.5f
         c.drawCircle(cx, cy, r * 0.85f, line)
         c.drawLine(cx - r * 0.85f, cy, cx + r * 0.85f, cy, line)
         c.drawOval(RectF(cx - r * 0.38f, cy - r * 0.85f, cx + r * 0.38f, cy + r * 0.85f), line)
@@ -685,46 +735,31 @@ object CertificateDrawer {
     }
 
     // ==================================================================
-    // QR + SIGNATURE
+    // DYNAMIC QR CODE
     // ==================================================================
     private fun drawQr(c: Canvas, fill: Paint, line: Paint, qr: Bitmap?) {
-        val box = Rect(1830, 1120, 2020, 1310)
+        val qrLeft = 1760
+        val qrTop = 1170
+        val qrSize = 250
+        val box = Rect(qrLeft, qrTop, qrLeft + qrSize, qrTop + qrSize)
+
+        // Clean white background card for high-contrast scanning
         fill.color = WHITE
         c.drawRect(box, fill)
+
         if (qr != null) {
+            val inset = 12
+            val qrDst = Rect(box.left + inset, box.top + inset, box.right - inset, box.bottom - inset)
             val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            c.drawBitmap(qr, null, box, bitmapPaint)
+            c.drawBitmap(qr, null, qrDst, bitmapPaint)
         }
-        line.color = GOLD_SOFT
-        line.strokeWidth = 2f
+
+        // Delicate golden framing line
+        line.color = GOLD_LIGHT
+        line.strokeWidth = 2.5f
         c.drawRect(RectF(box), line)
 
-        fill.color = NAVY
-        fill.typeface = SANS
-        fill.textSize = 22f
-        fill.textAlign = Align.CENTER
-        c.drawText("Scan to verify", box.exactCenterX(), box.bottom + 36f, fill)
-    }
-
-    /**
-     * Director signature block — intentionally BLANK above the rule.
-     * Only the rule, the "Director Signature" label and the roll/reg number.
-     */
-    private fun drawSignatureBlock(c: Canvas, fill: Paint, line: Paint, cert: CertificateData) {
-        val cx = 2140f
-
-        line.color = NAVY
-        line.strokeWidth = 3f
-        c.drawLine(cx - 150f, Y_SIGN_RULE, cx + 150f, Y_SIGN_RULE, line)
-
-        fill.color = NAVY
-        fill.typeface = SERIF_BOLD
-        fill.textSize = 30f
-        fill.textAlign = Align.CENTER
-        c.drawText("Director Signature", cx, Y_SIGN_RULE + 46f, fill)
-
-        fill.typeface = SERIF
-        fill.textSize = 24f
-        c.drawText("ROLL NO/REG NO: ${cert.rollNo}", cx, Y_SIGN_RULE + 88f, fill)
+        // Note: No "Scan to verify" text as per the reference certificate design.
     }
 }
+
