@@ -72,11 +72,11 @@ function doPost(e) {
       if (!targetId) {
         return jsonResponse({
           status: "error",
-          message: "Delete failed: Certificate ID or Roll Number is required."
+          message: "Delete failed: Certificate ID is required."
         });
       }
 
-      var rowIndex = findCertificateRow(sheet, targetId);
+      var rowIndex = findCertificateRowById(sheet, targetId);
       if (rowIndex > 0) {
         sheet.deleteRow(rowIndex);
         return jsonResponse({
@@ -87,8 +87,10 @@ function doPost(e) {
         });
       } else {
         return jsonResponse({
-          status: "error",
-          message: "Certificate '" + targetId + "' not found in cloud registry."
+          status: "success",
+          action: "deleted",
+          certificateId: targetId,
+          message: "Certificate '" + targetId + "' not found in cloud registry (already deleted)."
         });
       }
     }
@@ -102,7 +104,7 @@ function doPost(e) {
       });
     }
 
-    // 4. Handle CREATE / UPDATE (Upsert)
+    // 4. Handle CREATE / UPDATE (Upsert using certificateId as idempotency key)
     var rollNo = (data.rollNo || data.regdNo || "").trim();
     var certificateId = (data.certificateId || "").trim();
     if (!certificateId && rollNo) {
@@ -139,7 +141,10 @@ function doPost(e) {
       });
     }
 
-    var verificationUrl = VERIFICATION_BASE_URL + "?certNo=" + encodeURIComponent(certificateId);
+    var verificationUrl = (data.verificationUrl || "").trim();
+    if (!verificationUrl) {
+      verificationUrl = VERIFICATION_BASE_URL + "?certNo=" + encodeURIComponent(certificateId);
+    }
     var timestampStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT", "yyyy-MM-dd HH:mm:ss");
 
     var rowValues = [
@@ -158,11 +163,11 @@ function doPost(e) {
       verificationUrl
     ];
 
-    // Search for existing record by Certificate ID or Roll No
-    var existingRow = findCertificateRow(sheet, certificateId, rollNo);
+    // Search strictly by Certificate ID to preserve multiple certificates per roll number
+    var existingRow = findCertificateRowById(sheet, certificateId);
 
     if (existingRow > 0) {
-      // UPDATE existing row in place (prevent duplicates)
+      // UPDATE existing row in place (idempotent retry)
       var range = sheet.getRange(existingRow, 1, 1, rowValues.length);
       range.setValues([rowValues]);
       return jsonResponse({
@@ -202,13 +207,13 @@ function doGet(e) {
     return jsonResponse({
       status: "success",
       service: "LGES Certificate Sync API",
-      version: "2.0",
+      version: "2.1",
       active: true
     });
   }
 
   var sheet = getOrCreateSheet();
-  var row = findCertificateRow(sheet, certId);
+  var row = findCertificateRowById(sheet, certId);
   if (row > 0) {
     var data = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
     return jsonResponse({
@@ -238,30 +243,36 @@ function doGet(e) {
   }
 }
 
-function findCertificateRow(sheet, certificateId, rollNo) {
+/**
+ * Searches for a certificate row strictly by Certificate ID (Col B).
+ * Ensures multiple certificates for the same student roll number do not overwrite each other.
+ */
+function findCertificateRowById(sheet, certificateId) {
   var lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return -1; // Only header or empty
+  if (lastRow <= 1) return -1;
 
-  // Read columns B (Cert ID) and C (Roll No)
-  var certIdRange = sheet.getRange(2, 2, lastRow - 1, 2).getValues();
-  var targetCert = (certificateId || "").trim().toUpperCase();
-  var targetRoll = (rollNo || "").trim().toUpperCase();
+  var target = (certificateId || "").trim().toUpperCase();
+  if (!target) return -1;
+
+  // Read columns B (Cert ID)
+  var certIdRange = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
 
   for (var i = 0; i < certIdRange.length; i++) {
     var rowCertId = (certIdRange[i][0] || "").toString().trim().toUpperCase();
-    var rowRollNo = (certIdRange[i][1] || "").toString().trim().toUpperCase();
-
-    if (targetCert && rowCertId === targetCert) {
+    if (rowCertId === target) {
       return i + 2; // 1-indexed row number
     }
-    if (targetRoll && rowRollNo === targetRoll) {
-      return i + 2;
-    }
-    // Backward compatibility for legacy sheets where Col B stored rollNo
-    if (targetRoll && rowCertId === targetRoll) {
-      return i + 2;
+  }
+
+  // Fallback for legacy records where Col B might contain roll number
+  var rollRange = sheet.getRange(2, 3, lastRow - 1, 1).getValues();
+  for (var j = 0; j < rollRange.length; j++) {
+    var rowRoll = (rollRange[j][0] || "").toString().trim().toUpperCase();
+    if (rowRoll === target || ("LGES-" + rowRoll) === target) {
+      return j + 2;
     }
   }
+
   return -1;
 }
 

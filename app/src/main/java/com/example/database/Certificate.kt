@@ -5,26 +5,38 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.util.CertificateConfig
 
+/**
+ * Cloud synchronization status for offline-first durable consistency.
+ */
+enum class SyncStatus {
+    PENDING,
+    SYNCING,
+    SYNCED,
+    FAILED,
+    DELETE_PENDING,
+    DELETE_FAILED
+}
+
 @Entity(
     tableName = "certificates",
     indices = [
         Index(value = ["rollNo"]),
-        Index(value = ["timestamp"])
+        Index(value = ["timestamp"]),
+        Index(value = ["syncStatus"])
     ]
 )
 data class Certificate(
 
     /**
-     * Unique identity of THIS certificate.
-     *
-     * This must NOT be based on rollNo because a student can
-     * receive multiple certificates.
+     * Immutable unique identity of THIS certificate.
+     * Primary key. Not derived from roll number.
      */
     @PrimaryKey
     val certificateId: String,
 
     /**
      * Roll number assigned to this certificate/enrollment.
+     * Multiple certificates can share the same roll number.
      */
     val rollNo: String,
 
@@ -45,24 +57,46 @@ data class Certificate(
     val dateOfIssue: String,
 
     /**
-     * Examples:
-     * Course
-     * Internship
+     * Examples: Course, Internship
      */
     val certType: String,
 
     val timestamp: Long = System.currentTimeMillis(),
 
-    val isSynced: Boolean = false
+    /**
+     * Robust synchronization state for offline-first durability.
+     */
+    val syncStatus: SyncStatus = SyncStatus.PENDING,
+
+    /**
+     * Epoch timestamp in milliseconds of last successful or attempted sync.
+     */
+    val lastSyncTime: Long? = null,
+
+    /**
+     * Number of times synchronization has been retried.
+     */
+    val retryCount: Int = 0,
+
+    /**
+     * Description of last synchronization error, if any.
+     */
+    val lastSyncError: String? = null
 ) {
+
+    /**
+     * Backward-compatible property for existing callers and exporters.
+     */
+    val isSynced: Boolean
+        get() = syncStatus == SyncStatus.SYNCED
 
     companion object {
 
         /**
-         * Creates a certificate with a unique certificate ID.
+         * Factory function to create or reconstruct a Certificate.
          *
-         * customId can be supplied when importing an existing
-         * certificate or when the server has already assigned an ID.
+         * @param customId Preserved when editing an existing certificate or importing historical data.
+         *                 When null or blank, a new unique modern certificate ID is generated.
          */
         fun create(
             rollNo: String,
@@ -76,7 +110,11 @@ data class Certificate(
             dateOfIssue: String,
             certType: String,
             timestamp: Long = System.currentTimeMillis(),
+            syncStatus: SyncStatus = SyncStatus.PENDING,
             isSynced: Boolean = false,
+            lastSyncTime: Long? = null,
+            retryCount: Int = 0,
+            lastSyncError: String? = null,
             customId: String? = null
         ): Certificate {
 
@@ -89,12 +127,19 @@ data class Certificate(
             val cleanGrade = grade.trim()
             val cleanPlaceOfIssue = placeOfIssue.trim()
             val cleanDateOfIssue = dateOfIssue.trim()
-            val cleanCertType = certType.trim()
+            val cleanCertType = certType.trim().ifBlank { "Course" }
 
             val certId = customId
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
                 ?: CertificateConfig.generateCertificateId()
+
+            // Resolve status: if explicitly synced via legacy flag, map to SYNCED
+            val effectiveStatus = if (isSynced && syncStatus == SyncStatus.PENDING) {
+                SyncStatus.SYNCED
+            } else {
+                syncStatus
+            }
 
             return Certificate(
                 certificateId = certId,
@@ -109,7 +154,10 @@ data class Certificate(
                 dateOfIssue = cleanDateOfIssue,
                 certType = cleanCertType,
                 timestamp = timestamp,
-                isSynced = isSynced
+                syncStatus = effectiveStatus,
+                lastSyncTime = lastSyncTime,
+                retryCount = retryCount,
+                lastSyncError = lastSyncError
             )
         }
     }

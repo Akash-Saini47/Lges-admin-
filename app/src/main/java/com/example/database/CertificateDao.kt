@@ -11,13 +11,24 @@ import kotlinx.coroutines.flow.Flow
 interface CertificateDao {
 
     /**
-     * Returns all certificates, newest first.
+     * Returns all active certificates, newest first.
+     * Excludes records marked for remote deletion.
      */
-    @Query("SELECT * FROM certificates ORDER BY timestamp DESC")
+    @Query("""
+        SELECT * FROM certificates 
+        WHERE syncStatus NOT IN ('DELETE_PENDING', 'DELETE_FAILED') 
+        ORDER BY timestamp DESC
+    """)
     fun getAllCertificates(): Flow<List<Certificate>>
 
     /**
-     * Returns one certificate by its unique certificate ID.
+     * Returns ALL certificates including pending deletions (for internal sync manager).
+     */
+    @Query("SELECT * FROM certificates ORDER BY timestamp DESC")
+    suspend fun getAllCertificatesRaw(): List<Certificate>
+
+    /**
+     * Returns one certificate by its unique primary key ID.
      */
     @Query("""
         SELECT * FROM certificates
@@ -29,14 +40,12 @@ interface CertificateDao {
     ): Certificate?
 
     /**
-     * Returns ALL certificates having the specified roll number.
-     *
-     * Do NOT use LIMIT 1 here because one roll number may
-     * eventually be associated with multiple certificates.
+     * Returns ALL certificates having the specified roll number (excluding pending deletions).
      */
     @Query("""
         SELECT * FROM certificates
-        WHERE rollNo = :rollNo
+        WHERE rollNo = :rollNo 
+          AND syncStatus NOT IN ('DELETE_PENDING', 'DELETE_FAILED')
         ORDER BY timestamp DESC
     """)
     suspend fun getCertificatesByRollNo(
@@ -44,11 +53,12 @@ interface CertificateDao {
     ): List<Certificate>
 
     /**
-     * Reactive version for observing certificates by roll number.
+     * Reactive observation of certificates by roll number.
      */
     @Query("""
         SELECT * FROM certificates
         WHERE rollNo = :rollNo
+          AND syncStatus NOT IN ('DELETE_PENDING', 'DELETE_FAILED')
         ORDER BY timestamp DESC
     """)
     fun observeCertificatesByRollNo(
@@ -57,10 +67,6 @@ interface CertificateDao {
 
     /**
      * Inserts a certificate.
-     *
-     * REPLACE is retained for compatibility with the existing
-     * application. Since certificateId is the primary key,
-     * replacing only affects the same certificate ID.
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCertificate(
@@ -76,20 +82,89 @@ interface CertificateDao {
     )
 
     /**
-     * Updates cloud synchronization state.
+     * Updates cloud synchronization state with full metadata.
      */
     @Query("""
         UPDATE certificates
-        SET isSynced = :isSynced
+        SET syncStatus = :syncStatus,
+            lastSyncTime = :lastSyncTime,
+            lastSyncError = :lastSyncError,
+            retryCount = :retryCount
+        WHERE certificateId = :certificateId
+    """)
+    suspend fun updateSyncState(
+        certificateId: String,
+        syncStatus: SyncStatus,
+        lastSyncTime: Long? = System.currentTimeMillis(),
+        lastSyncError: String? = null,
+        retryCount: Int = 0
+    )
+
+    /**
+     * Updates cloud synchronization state (legacy boolean overload).
+     */
+    @Query("""
+        UPDATE certificates
+        SET syncStatus = CASE WHEN :isSynced = 1 THEN 'SYNCED' ELSE 'PENDING' END,
+            lastSyncTime = CASE WHEN :isSynced = 1 THEN :currentTime ELSE lastSyncTime END,
+            lastSyncError = NULL
         WHERE certificateId = :certificateId
     """)
     suspend fun updateSyncStatus(
         certificateId: String,
-        isSynced: Boolean
+        isSynced: Boolean,
+        currentTime: Long = System.currentTimeMillis()
     )
 
     /**
-     * Deletes exactly one certificate.
+     * Marks a certificate for remote deletion in a durable offline-first queue.
+     */
+    @Query("""
+        UPDATE certificates
+        SET syncStatus = 'DELETE_PENDING'
+        WHERE certificateId = :certificateId
+    """)
+    suspend fun markForDeletion(
+        certificateId: String
+    )
+
+    /**
+     * Marks a certificate as failed remote deletion so WorkManager can retry.
+     */
+    @Query("""
+        UPDATE certificates
+        SET syncStatus = 'DELETE_FAILED',
+            lastSyncError = :error,
+            retryCount = retryCount + 1
+        WHERE certificateId = :certificateId
+    """)
+    suspend fun markDeletionFailed(
+        certificateId: String,
+        error: String?
+    )
+
+    /**
+     * Returns pending uploads for background synchronization.
+     */
+    @Query("""
+        SELECT * FROM certificates
+        WHERE syncStatus IN ('PENDING', 'FAILED')
+        ORDER BY timestamp ASC
+    """)
+    suspend fun getPendingUploads(): List<Certificate>
+
+    /**
+     * Returns pending deletions for background synchronization.
+     */
+    @Query("""
+        SELECT * FROM certificates
+        WHERE syncStatus IN ('DELETE_PENDING', 'DELETE_FAILED')
+        ORDER BY timestamp ASC
+    """)
+    suspend fun getPendingDeletions(): List<Certificate>
+
+    /**
+     * Deletes exactly one certificate from local database by primary key.
      */
     @Query("""
         DELETE FROM certificates
@@ -101,9 +176,6 @@ interface CertificateDao {
 
     /**
      * Deletes all certificates associated with a roll number.
-     *
-     * Use carefully: if multiple certificates share a roll number,
-     * all of them will be deleted.
      */
     @Query("""
         DELETE FROM certificates

@@ -10,29 +10,13 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import com.example.database.Certificate
+import com.example.util.AppLogger
 import com.example.util.CertificateConfig
 import java.io.File
 import java.io.FileOutputStream
-import java.util.Locale
 
 /**
- * CertificateDrawer
- *
- * Uses ONLY:
- *
- * assets/Reference_certificate.pdf
- *
- * The PDF provides the static certificate artwork.
- * Dynamic student/certificate information is drawn over it.
- *
- * Current certificate layout and coordinates are intentionally preserved.
- *
- * Certificate dimensions:
- * 2400 x 1600
- * Aspect ratio: 3:2
- *
- * Multiple certificates are supported.
- * Every Certificate object is rendered independently.
+ * Data structure for rendering a single certificate.
  */
 data class CertificateData(
     val rollNo: String,
@@ -50,304 +34,183 @@ data class CertificateData(
 
 object CertificateDrawer {
 
-    // ================================================================
-    // CERTIFICATE CANVAS
-    // ================================================================
+    private const val TAG = "CertificateDrawer"
 
-    private const val W = 2400
-    private const val H = 1600
+    // Master certificate canvas dimensions
+    const val W = 2400
+    const val H = 1600
 
-    /**
-     * Increment this whenever Reference_certificate.pdf is replaced.
-     *
-     * The cache file is refreshed every time anyway, but keeping the
-     * version in the filename makes stale-cache problems much less likely.
-     */
     private const val TEMPLATE_VERSION = "v2"
-
     private const val TEMPLATE_FILE = "Reference_certificate.pdf"
 
-    // ================================================================
-    // TYPEFACES
-    // ================================================================
+    // In-memory cache for the static artwork to prevent repeated PDF extraction
+    @Volatile
+    private var cachedTemplateBitmap: Bitmap? = null
+    private val templateLock = Any()
 
-    private val SERIF_BOLD =
-        Typeface.create(
-            Typeface.SERIF,
-            Typeface.BOLD
-        )
+    // Typefaces
+    private val SERIF_BOLD: Typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
 
-    private val SERIF =
-        Typeface.create(
-            Typeface.SERIF,
-            Typeface.NORMAL
-        )
-
-    // ================================================================
-    // COLORS
-    // ================================================================
-
-    private val NAVY =
-        0xFF0B1B3D.toInt()
-
-    private val INK =
-        0xFF1E293B.toInt()
-
-    // ================================================================
-    // PUBLIC API
-    // ================================================================
+    // Palette
+    private val NAVY = 0xFF0B1B3D.toInt()
+    private val INK = 0xFF1E293B.toInt()
 
     /**
-     * Converts a database Certificate into CertificateData.
-     *
-     * Each certificate is handled independently.
-     *
-     * This is important when the same student has:
-     *
-     * - Course certificate
-     * - Internship certificate
-     * - Multiple course certificates
-     * - Certificates with different roll numbers
+     * Converts a database Certificate into CertificateData for rendering.
      */
-    fun drawCertificate(
-        context: Context,
+    fun buildCertificateData(
         cert: Certificate,
-        qrBitmap: Bitmap?
-    ): Bitmap {
+        instituteName: String = CertificateConfig.DEFAULT_INSTITUTE_NAME,
+        websiteUrl: String = CertificateConfig.DEFAULT_INSTITUTE_WEBSITE
+    ): CertificateData {
+        val normalizedRollNo = cert.rollNo.trim().ifBlank { cert.certificateId.trim() }
+        val normalizedWebsite = websiteUrl.trim().removeSuffix("/")
 
-        val normalizedRollNo =
-            cert.rollNo
-                .trim()
-                .ifBlank {
-                    cert.certificateId.trim()
-                }
-
-        val normalizedWebsite =
-            CertificateConfig.DEFAULT_INSTITUTE_WEBSITE
-                .trim()
-                .removeSuffix("/")
-
-        val data =
-            CertificateData(
-                rollNo = normalizedRollNo,
-
-                studentName =
-                    cert.studentName.trim(),
-
-                guardian =
-                    cert.fatherName.trim(),
-
-                course =
-                    cert.courseName.trim(),
-
-                session =
-                    cert.sessionRange.trim(),
-
-                grade =
-                    cert.grade.trim(),
-
-                runBy =
-                    "Lakshmi Group of Education Society",
-
-                duration =
-                    cert.duration.trim(),
-
-                dateOfIssue =
-                    cert.dateOfIssue.trim(),
-
-                placeOfIssue =
-                    cert.placeOfIssue
-                        .trim()
-                        .ifBlank {
-                            "CHAMBA"
-                        },
-
-                website =
-                    normalizedWebsite
-            )
-
-        return draw(
-            context = context,
-            cert = data,
-            qr = qrBitmap
+        return CertificateData(
+            rollNo = normalizedRollNo,
+            studentName = cert.studentName.trim(),
+            guardian = cert.fatherName.trim(),
+            course = cert.courseName.trim(),
+            session = cert.sessionRange.trim(),
+            grade = cert.grade.trim(),
+            runBy = instituteName.trim().ifBlank { CertificateConfig.DEFAULT_INSTITUTE_NAME },
+            duration = cert.duration.trim(),
+            dateOfIssue = cert.dateOfIssue.trim(),
+            placeOfIssue = cert.placeOfIssue.trim().ifBlank { "CHAMBA" },
+            website = normalizedWebsite
         )
     }
 
     /**
-     * Main rendering function.
-     *
-     * The static artwork is loaded from Reference_certificate.pdf.
-     * Dynamic information is then drawn using the existing coordinates.
+     * Full-resolution render (2400 x 1600). Used for export and high-fidelity output.
+     */
+    fun drawCertificate(
+        context: Context,
+        cert: Certificate,
+        qrBitmap: Bitmap?,
+        instituteName: String = CertificateConfig.DEFAULT_INSTITUTE_NAME,
+        websiteUrl: String = CertificateConfig.DEFAULT_INSTITUTE_WEBSITE
+    ): Bitmap {
+        val data = buildCertificateData(cert, instituteName, websiteUrl)
+        return draw(context = context, cert = data, qr = qrBitmap)
+    }
+
+    /**
+     * Lightweight scaled-down render (e.g. 1200 x 800 or 900 x 600) for live UI preview.
+     * Conserves memory and keeps Compose UI buttery smooth.
+     */
+    fun drawPreviewCertificate(
+        context: Context,
+        cert: Certificate,
+        qrBitmap: Bitmap?,
+        previewWidth: Int = 1200,
+        instituteName: String = CertificateConfig.DEFAULT_INSTITUTE_NAME,
+        websiteUrl: String = CertificateConfig.DEFAULT_INSTITUTE_WEBSITE
+    ): Bitmap {
+        val fullBitmap = drawCertificate(context, cert, qrBitmap, instituteName, websiteUrl)
+        if (fullBitmap.width == previewWidth) return fullBitmap
+
+        val previewHeight = (previewWidth * (H.toFloat() / W.toFloat())).toInt()
+        val scaled = Bitmap.createScaledBitmap(fullBitmap, previewWidth, previewHeight, true)
+        if (scaled != fullBitmap) {
+            fullBitmap.recycle()
+        }
+        return scaled
+    }
+
+    /**
+     * Core drawing routine.
      */
     fun draw(
         context: Context,
         cert: CertificateData,
         qr: Bitmap?
     ): Bitmap {
+        val template = getOrLoadTemplate(context)
+            ?: throw IllegalStateException("Certificate master template could not be loaded from assets/$TEMPLATE_FILE")
 
-        val template =
-            loadReferenceCertificate(context)
-                ?: throw IllegalStateException(
-                    """
-                    Certificate template could not be loaded.
-                    
-                    Required asset:
-                    assets/$TEMPLATE_FILE
-                    
-                    No fallback certificate template is used.
-                    """.trimIndent()
-                )
+        val output = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
 
-        val output =
-            Bitmap.createBitmap(
-                W,
-                H,
-                Bitmap.Config.ARGB_8888
-            )
+        // Draw static template
+        val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(template, null, Rect(0, 0, W, H), bitmapPaint)
 
-        val canvas =
-            Canvas(output)
+        // Draw dynamic text
+        drawDynamicData(canvas = canvas, cert = cert)
 
-        // ------------------------------------------------------------
-        // STATIC TEMPLATE
-        // ------------------------------------------------------------
-
-        val bitmapPaint =
-            Paint(
-                Paint.ANTI_ALIAS_FLAG or
-                        Paint.FILTER_BITMAP_FLAG
-            )
-
-        canvas.drawBitmap(
-            template,
-            null,
-            Rect(
-                0,
-                0,
-                W,
-                H
-            ),
-            bitmapPaint
-        )
-
-        // ------------------------------------------------------------
-        // DYNAMIC TEXT
-        // ------------------------------------------------------------
-
-        drawDynamicData(
-            canvas = canvas,
-            cert = cert
-        )
-
-        // ------------------------------------------------------------
-        // DYNAMIC QR
-        // ------------------------------------------------------------
-
-        drawDynamicQr(
-            canvas = canvas,
-            qr = qr
-        )
-
-        /*
-         * The rendered template bitmap is no longer required after
-         * being drawn onto the final canvas.
-         *
-         * recycle() is deliberately NOT called because bitmap ownership
-         * is managed by the Android runtime and premature recycling can
-         * cause rendering crashes.
-         */
+        // Draw dynamic QR
+        drawDynamicQr(canvas = canvas, qr = qr)
 
         return output
     }
 
-    // ================================================================
-    // MASTER PDF LOADER
-    // ================================================================
+    /**
+     * Thread-safe in-memory cached template loader.
+     */
+    fun getOrLoadTemplate(context: Context): Bitmap? {
+        cachedTemplateBitmap?.let {
+            if (!it.isRecycled) return it
+        }
 
-    private fun loadReferenceCertificate(
-        context: Context
-    ): Bitmap? {
+        synchronized(templateLock) {
+            cachedTemplateBitmap?.let {
+                if (!it.isRecycled) return it
+            }
+            val loaded = loadReferenceCertificate(context)
+            cachedTemplateBitmap = loaded
+            return loaded
+        }
+    }
 
-        return try {
-
-            val cacheFile =
-                File(
-                    context.cacheDir,
-                    "Reference_certificate_$TEMPLATE_VERSION.pdf"
-                )
-
-            /*
-             * Always copy the current asset into cache.
-             *
-             * This prevents an old PDF from remaining after the asset
-             * has been replaced.
-             */
-            context.assets
-                .open(TEMPLATE_FILE)
-                .use { input ->
-
-                    FileOutputStream(cacheFile)
-                        .use { output ->
-
-                            input.copyTo(output)
-                        }
+    /**
+     * Clears template cache (call if asset changes or low memory event occurs).
+     */
+    fun clearCache() {
+        synchronized(templateLock) {
+            cachedTemplateBitmap?.let {
+                if (!it.isRecycled) {
+                    it.recycle()
                 }
+            }
+            cachedTemplateBitmap = null
+        }
+    }
 
-            if (!cacheFile.exists() ||
-                cacheFile.length() <= 0L
-            ) {
-                throw IllegalStateException(
-                    "Reference certificate PDF is empty."
-                )
+    private fun loadReferenceCertificate(context: Context): Bitmap? {
+        return try {
+            val cacheFile = File(context.cacheDir, "Reference_certificate_$TEMPLATE_VERSION.pdf")
+
+            // Only copy from assets if cache file doesn't exist or is empty
+            if (!cacheFile.exists() || cacheFile.length() <= 0L) {
+                context.assets.open(TEMPLATE_FILE).use { input ->
+                    FileOutputStream(cacheFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
             }
 
-            ParcelFileDescriptor
-                .open(
-                    cacheFile,
-                    ParcelFileDescriptor.MODE_READ_ONLY
-                )
-                .use { descriptor ->
+            if (!cacheFile.exists() || cacheFile.length() <= 0L) {
+                AppLogger.e(TAG, "Reference certificate PDF is empty.")
+                return null
+            }
 
-                    PdfRenderer(descriptor)
-                        .use { renderer ->
+            ParcelFileDescriptor.open(cacheFile, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                PdfRenderer(descriptor).use { renderer ->
+                    if (renderer.pageCount <= 0) {
+                        AppLogger.e(TAG, "Reference_certificate.pdf contains no pages.")
+                        return null
+                    }
 
-                            if (renderer.pageCount <= 0) {
-                                throw IllegalStateException(
-                                    "Reference_certificate.pdf contains no pages."
-                                )
-                            }
-
-                            renderer
-                                .openPage(0)
-                                .use { page ->
-
-                                    val bitmap =
-                                        Bitmap.createBitmap(
-                                            W,
-                                            H,
-                                            Bitmap.Config.ARGB_8888
-                                        )
-
-                                    /*
-                                     * Render the first page directly into
-                                     * the final 2400 x 1600 certificate bitmap.
-                                     */
-                                    page.render(
-                                        bitmap,
-                                        null,
-                                        null,
-                                        PdfRenderer.Page.RENDER_MODE_FOR_PRINT
-                                    )
-
-                                    bitmap
-                                }
-                        }
+                    renderer.openPage(0).use { page ->
+                        val bitmap = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                        bitmap
+                    }
                 }
-
+            }
         } catch (e: Exception) {
-
-            e.printStackTrace()
-
+            AppLogger.e(TAG, "Failed to render PDF template: ${e.message}", e)
             null
         }
     }
@@ -360,26 +223,13 @@ object CertificateDrawer {
         canvas: Canvas,
         cert: CertificateData
     ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = SERIF_BOLD
+            color = INK
+            textAlign = Paint.Align.CENTER
+        }
 
-        val paint =
-            Paint(
-                Paint.ANTI_ALIAS_FLAG
-            )
-
-        paint.typeface =
-            SERIF_BOLD
-
-        paint.color =
-            INK
-
-        paint.textAlign =
-            Paint.Align.CENTER
-
-        // ------------------------------------------------------------
         // Student Name
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
         drawFittedText(
             canvas = canvas,
             text = cert.studentName,
@@ -391,21 +241,10 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
-        // Father / Guardian
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
-        paint.textSize =
-            30f
-
-        val guardianText =
-            normalizeGuardian(
-                cert.guardian
-            )
-
+        // Guardian
+        paint.textSize = 30f
+        val guardianText = normalizeGuardian(cert.guardian)
         if (guardianText.isNotBlank()) {
-
             drawFittedText(
                 canvas = canvas,
                 text = guardianText,
@@ -418,14 +257,8 @@ object CertificateDrawer {
             )
         }
 
-        // ------------------------------------------------------------
-        // Course
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
-        paint.color =
-            NAVY
-
+        // Course Name
+        paint.color = NAVY
         drawFittedText(
             canvas = canvas,
             text = cert.course,
@@ -437,14 +270,8 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
-        // Session
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
-        paint.textAlign =
-            Paint.Align.LEFT
-
+        // Session Range
+        paint.textAlign = Paint.Align.LEFT
         drawFittedTextLeft(
             canvas = canvas,
             text = cert.session,
@@ -456,11 +283,7 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
         // Performance Grade
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
         drawFittedTextLeft(
             canvas = canvas,
             text = cert.grade,
@@ -472,11 +295,7 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
-        // Run By
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
+        // Run By (Institute)
         drawFittedTextLeft(
             canvas = canvas,
             text = cert.runBy,
@@ -488,11 +307,7 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
         // Duration
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
         drawFittedTextLeft(
             canvas = canvas,
             text = cert.duration,
@@ -504,11 +319,7 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
-        // Date
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
+        // Date of Issue
         drawFittedTextLeft(
             canvas = canvas,
             text = cert.dateOfIssue,
@@ -520,11 +331,7 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
-        // Place
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
+        // Place of Issue
         drawFittedTextLeft(
             canvas = canvas,
             text = cert.placeOfIssue,
@@ -536,11 +343,7 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
         // Website
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
         drawFittedTextLeft(
             canvas = canvas,
             text = cleanWebsiteForDisplay(cert.website),
@@ -552,11 +355,7 @@ object CertificateDrawer {
             paint = paint
         )
 
-        // ------------------------------------------------------------
         // Roll / Registration Number
-        // Existing coordinate preserved.
-        // ------------------------------------------------------------
-
         drawFittedTextLeft(
             canvas = canvas,
             text = cert.rollNo,
@@ -569,136 +368,38 @@ object CertificateDrawer {
         )
     }
 
-    // ================================================================
-    // GUARDIAN NORMALIZATION
-    // ================================================================
+    private fun normalizeGuardian(guardian: String): String {
+        val clean = guardian.trim().replace(Regex("\\s+"), " ")
+        if (clean.isBlank()) return ""
 
-    private fun normalizeGuardian(
-        guardian: String
-    ): String {
-
-        val clean =
-            guardian
-                .trim()
-                .replace(
-                    Regex("\\s+"),
-                    " "
-                )
-
-        if (clean.isBlank()) {
-            return ""
-        }
-
-        /*
-         * Preserve an explicitly supplied relationship.
-         */
-        if (
-            clean.startsWith(
-                "S/O ",
-                ignoreCase = true
-            ) ||
-            clean.startsWith(
-                "D/O ",
-                ignoreCase = true
-            ) ||
-            clean.startsWith(
-                "W/O ",
-                ignoreCase = true
-            ) ||
-            clean.startsWith(
-                "C/O ",
-                ignoreCase = true
-            )
+        if (clean.startsWith("S/O ", ignoreCase = true) ||
+            clean.startsWith("D/O ", ignoreCase = true) ||
+            clean.startsWith("W/O ", ignoreCase = true) ||
+            clean.startsWith("C/O ", ignoreCase = true)
         ) {
             return clean
         }
-
-        /*
-         * Existing application behavior defaults to S/O.
-         */
         return "S/O $clean"
     }
 
-    // ================================================================
-    // WEBSITE NORMALIZATION
-    // ================================================================
-
-    private fun cleanWebsiteForDisplay(
-        website: String
-    ): String {
-
-        val clean =
-            website
-                .trim()
-                .removePrefix("https://")
-                .removePrefix("http://")
-                .removeSuffix("/")
-
-        return clean
+    private fun cleanWebsiteForDisplay(website: String): String {
+        return website.trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .removeSuffix("/")
     }
 
-    // ================================================================
-    // DYNAMIC QR
-    // ================================================================
+    private fun drawDynamicQr(canvas: Canvas, qr: Bitmap?) {
+        if (qr == null || qr.isRecycled || qr.width <= 0 || qr.height <= 0) return
 
-    private fun drawDynamicQr(
-        canvas: Canvas,
-        qr: Bitmap?
-    ) {
+        val left = 1545
+        val top = 1275
+        val size = 175
 
-        if (
-            qr == null ||
-            qr.isRecycled ||
-            qr.width <= 0 ||
-            qr.height <= 0
-        ) {
-            return
-        }
-
-        /*
-         * Existing QR position preserved.
-         *
-         * LEFT = 1545
-         * TOP  = 1275
-         * SIZE = 175
-         */
-        val left =
-            1545
-
-        val top =
-            1275
-
-        val size =
-            175
-
-        /*
-         * Existing 6px inset preserved.
-         */
-        val destination =
-            Rect(
-                left + 6,
-                top + 6,
-                left + size - 6,
-                top + size - 6
-            )
-
-        val paint =
-            Paint(
-                Paint.ANTI_ALIAS_FLAG or
-                        Paint.FILTER_BITMAP_FLAG
-            )
-
-        canvas.drawBitmap(
-            qr,
-            null,
-            destination,
-            paint
-        )
+        val destination = Rect(left + 6, top + 6, left + size - 6, top + size - 6)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(qr, null, destination, paint)
     }
-
-    // ================================================================
-    // CENTERED TEXT FITTING
-    // ================================================================
 
     private fun drawFittedText(
         canvas: Canvas,
@@ -710,62 +411,21 @@ object CertificateDrawer {
         minimumSize: Float,
         paint: Paint
     ) {
+        val cleanText = text.trim().replace(Regex("\\s+"), " ")
+        if (cleanText.isBlank()) return
 
-        val cleanText =
-            text
-                .trim()
-                .replace(
-                    Regex("\\s+"),
-                    " "
-                )
+        var size = preferredSize
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = size
 
-        if (cleanText.isBlank()) {
-            return
-        }
-
-        var size =
-            preferredSize
-
-        paint.textAlign =
-            Paint.Align.CENTER
-
-        paint.textSize =
-            size
-
-        while (
-            size > minimumSize &&
-            paint.measureText(cleanText) > maxWidth
-        ) {
-
+        while (size > minimumSize && paint.measureText(cleanText) > maxWidth) {
             size -= 1f
-
-            paint.textSize =
-                size
+            paint.textSize = size
         }
 
-        /*
-         * If the text still does not fit at the minimum size,
-         * use a safely truncated version rather than allowing it
-         * to overwrite neighboring certificate elements.
-         */
-        val finalText =
-            fitTextWithEllipsis(
-                text = cleanText,
-                paint = paint,
-                maxWidth = maxWidth
-            )
-
-        canvas.drawText(
-            finalText,
-            centerX,
-            baselineY,
-            paint
-        )
+        val finalText = fitTextWithEllipsis(cleanText, paint, maxWidth)
+        canvas.drawText(finalText, centerX, baselineY, paint)
     }
-
-    // ================================================================
-    // LEFT-ALIGNED TEXT FITTING
-    // ================================================================
 
     private fun drawFittedTextLeft(
         canvas: Canvas,
@@ -777,100 +437,36 @@ object CertificateDrawer {
         minimumSize: Float,
         paint: Paint
     ) {
+        val cleanText = text.trim().replace(Regex("\\s+"), " ")
+        if (cleanText.isBlank()) return
 
-        val cleanText =
-            text
-                .trim()
-                .replace(
-                    Regex("\\s+"),
-                    " "
-                )
+        var size = preferredSize
+        paint.textAlign = Paint.Align.LEFT
+        paint.textSize = size
 
-        if (cleanText.isBlank()) {
-            return
-        }
-
-        var size =
-            preferredSize
-
-        paint.textAlign =
-            Paint.Align.LEFT
-
-        paint.textSize =
-            size
-
-        while (
-            size > minimumSize &&
-            paint.measureText(cleanText) > maxWidth
-        ) {
-
+        while (size > minimumSize && paint.measureText(cleanText) > maxWidth) {
             size -= 1f
-
-            paint.textSize =
-                size
+            paint.textSize = size
         }
 
-        val finalText =
-            fitTextWithEllipsis(
-                text = cleanText,
-                paint = paint,
-                maxWidth = maxWidth
-            )
-
-        canvas.drawText(
-            finalText,
-            x,
-            baselineY,
-            paint
-        )
+        val finalText = fitTextWithEllipsis(cleanText, paint, maxWidth)
+        canvas.drawText(finalText, x, baselineY, paint)
     }
 
-    // ================================================================
-    // ELLIPSIS PROTECTION
-    // ================================================================
+    private fun fitTextWithEllipsis(text: String, paint: Paint, maxWidth: Float): String {
+        if (text.isBlank() || paint.measureText(text) <= maxWidth) return text
 
-    private fun fitTextWithEllipsis(
-        text: String,
-        paint: Paint,
-        maxWidth: Float
-    ): String {
+        val ellipsis = "..."
+        if (paint.measureText(ellipsis) > maxWidth) return ""
 
-        if (
-            text.isBlank() ||
-            paint.measureText(text) <= maxWidth
-        ) {
-            return text
-        }
-
-        val ellipsis =
-            "..."
-
-        if (
-            paint.measureText(ellipsis) > maxWidth
-        ) {
-            return ""
-        }
-
-        var end =
-            text.length
-
+        var end = text.length
         while (end > 0) {
-
-            val candidate =
-                text.substring(
-                    0,
-                    end
-                ).trimEnd() + ellipsis
-
-            if (
-                paint.measureText(candidate) <= maxWidth
-            ) {
+            val candidate = text.substring(0, end).trimEnd() + ellipsis
+            if (paint.measureText(candidate) <= maxWidth) {
                 return candidate
             }
-
             end--
         }
-
         return ellipsis
     }
 }
