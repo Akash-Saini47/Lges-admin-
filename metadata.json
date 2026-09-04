@@ -1,0 +1,6 @@
+{
+  "name": "LGES Admin Panel",
+  "description": "Admin panel for LGES Computer Classes to manage and generate student and internship certificates with QR code verification and Google Sheets integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
