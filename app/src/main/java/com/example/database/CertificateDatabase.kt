@@ -7,17 +7,31 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Certificate::class], version = 2, exportSchema = false)
+@Database(
+    entities = [Certificate::class],
+    version = 3,
+    exportSchema = false
+)
 abstract class CertificateDatabase : RoomDatabase() {
+
     abstract fun certificateDao(): CertificateDao
 
     companion object {
+
         @Volatile
         private var INSTANCE: CertificateDatabase? = null
 
+        /**
+         * Migration from database version 1 to 2.
+         *
+         * Kept for users who still have an older database.
+         */
         val MIGRATION_1_2 = object : Migration(1, 2) {
+
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
+
+                db.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS certificates_new (
                         certificateId TEXT NOT NULL PRIMARY KEY,
                         rollNo TEXT NOT NULL,
@@ -33,40 +47,131 @@ abstract class CertificateDatabase : RoomDatabase() {
                         timestamp INTEGER NOT NULL,
                         isSynced INTEGER NOT NULL DEFAULT 0
                     )
-                """.trimIndent())
+                    """.trimIndent()
+                )
 
-                db.execSQL("""
+                /*
+                 * IMPORTANT:
+                 *
+                 * Old certificate IDs were generated from rollNo.
+                 *
+                 * We preserve existing IDs during migration instead
+                 * of changing them. Otherwise existing public
+                 * verification URLs would break.
+                 */
+                db.execSQL(
+                    """
                     INSERT INTO certificates_new (
-                        certificateId, rollNo, studentName, fatherName, courseName,
-                        sessionRange, duration, grade, placeOfIssue, dateOfIssue, certType, timestamp, isSynced
+                        certificateId,
+                        rollNo,
+                        studentName,
+                        fatherName,
+                        courseName,
+                        sessionRange,
+                        duration,
+                        grade,
+                        placeOfIssue,
+                        dateOfIssue,
+                        certType,
+                        timestamp,
+                        isSynced
                     )
-                    SELECT 
-                        CASE 
-                            WHEN rollNo LIKE 'LGES-%' THEN rollNo 
-                            ELSE 'LGES-' || rollNo 
-                        END,
-                        rollNo, studentName, fatherName, courseName,
-                        sessionRange, duration, grade, placeOfIssue, dateOfIssue, certType, timestamp, 0
+                    SELECT
+                        certificateId,
+                        rollNo,
+                        studentName,
+                        fatherName,
+                        courseName,
+                        sessionRange,
+                        duration,
+                        grade,
+                        placeOfIssue,
+                        dateOfIssue,
+                        certType,
+                        timestamp,
+                        isSynced
                     FROM certificates
-                """.trimIndent())
+                    """.trimIndent()
+                )
 
                 db.execSQL("DROP TABLE certificates")
-                db.execSQL("ALTER TABLE certificates_new RENAME TO certificates")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_certificates_rollNo ON certificates(rollNo)")
+
+                db.execSQL(
+                    "ALTER TABLE certificates_new RENAME TO certificates"
+                )
+
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS
+                    index_certificates_rollNo
+                    ON certificates(rollNo)
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS
+                    index_certificates_timestamp
+                    ON certificates(timestamp)
+                    """.trimIndent()
+                )
             }
         }
 
-        fun getDatabase(context: Context): CertificateDatabase {
+        /**
+         * Migration from version 2 to version 3.
+         *
+         * No column changes are required because the Certificate
+         * entity fields remain the same.
+         *
+         * The important change is the application-level ID generation:
+         * new certificates no longer derive certificateId from rollNo.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+
+            override fun migrate(db: SupportSQLiteDatabase) {
+
+                /*
+                 * Version 3 keeps the existing schema.
+                 *
+                 * Existing certificate IDs must remain unchanged
+                 * so that old verification URLs continue to work.
+                 *
+                 * New IDs are generated by CertificateConfig.
+                 */
+
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS
+                    index_certificates_timestamp
+                    ON certificates(timestamp)
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /**
+         * Returns the singleton database instance.
+         */
+        fun getDatabase(
+            context: Context
+        ): CertificateDatabase {
+
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+
+                INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     CertificateDatabase::class.java,
                     "certificate_database"
                 )
-                .addMigrations(MIGRATION_1_2)
-                .build()
-                INSTANCE = instance
-                instance
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3
+                    )
+                    .build()
+                    .also {
+                        INSTANCE = it
+                    }
             }
         }
     }

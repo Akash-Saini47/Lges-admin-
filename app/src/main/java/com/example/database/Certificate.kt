@@ -7,24 +7,63 @@ import com.example.util.CertificateConfig
 
 @Entity(
     tableName = "certificates",
-    indices = [Index(value = ["rollNo"])]
+    indices = [
+        Index(value = ["rollNo"]),
+        Index(value = ["timestamp"])
+    ]
 )
 data class Certificate(
-    @PrimaryKey val certificateId: String,
+
+    /**
+     * Unique identity of THIS certificate.
+     *
+     * This must NOT be based on rollNo because a student can
+     * receive multiple certificates.
+     */
+    @PrimaryKey
+    val certificateId: String,
+
+    /**
+     * Roll number assigned to this certificate/enrollment.
+     */
     val rollNo: String,
+
     val studentName: String,
+
     val fatherName: String,
+
     val courseName: String,
+
     val sessionRange: String,
+
     val duration: String,
+
     val grade: String,
+
     val placeOfIssue: String,
+
     val dateOfIssue: String,
-    val certType: String, // "Course" or "Internship"
+
+    /**
+     * Examples:
+     * Course
+     * Internship
+     */
+    val certType: String,
+
     val timestamp: Long = System.currentTimeMillis(),
+
     val isSynced: Boolean = false
 ) {
+
     companion object {
+
+        /**
+         * Creates a certificate with a unique certificate ID.
+         *
+         * customId can be supplied when importing an existing
+         * certificate or when the server has already assigned an ID.
+         */
         fun create(
             rollNo: String,
             studentName: String,
@@ -40,19 +79,35 @@ data class Certificate(
             isSynced: Boolean = false,
             customId: String? = null
         ): Certificate {
-            val certId = customId?.ifBlank { null } ?: CertificateConfig.computeCertificateId(rollNo)
+
+            val cleanRollNo = rollNo.trim()
+            val cleanStudentName = studentName.trim()
+            val cleanFatherName = fatherName.trim()
+            val cleanCourseName = courseName.trim()
+            val cleanSessionRange = sessionRange.trim()
+            val cleanDuration = duration.trim()
+            val cleanGrade = grade.trim()
+            val cleanPlaceOfIssue = placeOfIssue.trim()
+            val cleanDateOfIssue = dateOfIssue.trim()
+            val cleanCertType = certType.trim()
+
+            val certId = customId
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: CertificateConfig.generateCertificateId()
+
             return Certificate(
                 certificateId = certId,
-                rollNo = rollNo.trim(),
-                studentName = studentName.trim(),
-                fatherName = fatherName.trim(),
-                courseName = courseName.trim(),
-                sessionRange = sessionRange.trim(),
-                duration = duration.trim(),
-                grade = grade.trim(),
-                placeOfIssue = placeOfIssue.trim(),
-                dateOfIssue = dateOfIssue.trim(),
-                certType = certType,
+                rollNo = cleanRollNo,
+                studentName = cleanStudentName,
+                fatherName = cleanFatherName,
+                courseName = cleanCourseName,
+                sessionRange = cleanSessionRange,
+                duration = cleanDuration,
+                grade = cleanGrade,
+                placeOfIssue = cleanPlaceOfIssue,
+                dateOfIssue = cleanDateOfIssue,
+                certType = cleanCertType,
                 timestamp = timestamp,
                 isSynced = isSynced
             )

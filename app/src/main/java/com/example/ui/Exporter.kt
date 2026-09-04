@@ -31,8 +31,12 @@ object Exporter {
     private const val SHARED_CERTIFICATE_FOLDER = "shared_certificates"
     private const val SHARED_REPORT_FOLDER = "shared_reports"
 
-    // Reference certificate ratio: 3:2
+    // Certificate reference ratio: 3:2
     private const val CERTIFICATE_ASPECT_RATIO = 1.5f
+
+    // Prevent accidental huge QR bitmap allocations.
+    private const val MIN_QR_SIZE = 64
+    private const val MAX_QR_SIZE = 2048
 
     // ============================================================
     // FILE NAME
@@ -43,7 +47,7 @@ object Exporter {
         return rawName
             .trim()
             .replace(
-                Regex("[\\\\/:*?\"<>|\\s]+"),
+                Regex("""[\\/:*?"<>|\s]+"""),
                 "_"
             )
             .trim('_')
@@ -83,6 +87,95 @@ object Exporter {
         }
     }
 
+    private fun uniqueMediaStoreFileName(
+        context: Context,
+        baseName: String,
+        extension: String
+    ): String {
+
+        val safeBaseName =
+            sanitizeFileName(baseName)
+
+        val resolver =
+            context.contentResolver
+
+        var index = 0
+
+        while (true) {
+
+            val suffix =
+                if (index == 0) {
+                    ""
+                } else {
+                    "_$index"
+                }
+
+            val candidate =
+                "$safeBaseName$suffix.$extension"
+
+            val projection =
+                arrayOf(
+                    MediaStore.MediaColumns._ID
+                )
+
+            val selection =
+                "${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
+
+            val selectionArgs =
+                arrayOf(candidate)
+
+            val collection =
+                if (extension.equals("png", ignoreCase = true)) {
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                } else {
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                }
+
+            val exists =
+                try {
+                    resolver.query(
+                        collection,
+                        projection,
+                        selection,
+                        selectionArgs,
+                        null
+                    )?.use { cursor ->
+                        cursor.moveToFirst()
+                    } == true
+                } catch (_: Exception) {
+                    false
+                }
+
+            if (!exists) {
+                return candidate
+            }
+
+            index++
+        }
+    }
+
+    private fun ensureDirectory(
+        directory: File
+    ) {
+
+        if (directory.exists()) {
+
+            if (!directory.isDirectory) {
+                throw IllegalStateException(
+                    "Path exists but is not a directory: ${directory.absolutePath}"
+                )
+            }
+
+            return
+        }
+
+        if (!directory.mkdirs() && !directory.exists()) {
+            throw IllegalStateException(
+                "Unable to create directory: ${directory.absolutePath}"
+            )
+        }
+    }
+
     // ============================================================
     // QR CODE
     // ============================================================
@@ -95,12 +188,15 @@ object Exporter {
         val cleanText =
             text.trim()
 
-        if (
-            cleanText.isEmpty() ||
-            size <= 0
-        ) {
+        if (cleanText.isEmpty()) {
             return null
         }
+
+        val safeSize =
+            size.coerceIn(
+                MIN_QR_SIZE,
+                MAX_QR_SIZE
+            )
 
         return try {
 
@@ -108,8 +204,8 @@ object Exporter {
                 MultiFormatWriter().encode(
                     cleanText,
                     BarcodeFormat.QR_CODE,
-                    size,
-                    size
+                    safeSize,
+                    safeSize
                 )
 
             val width =
@@ -192,9 +288,6 @@ object Exporter {
         val safeBaseName =
             sanitizeFileName(fileName)
 
-        val safeName =
-            "$safeBaseName.png"
-
         var uri: Uri? = null
         var outputStream: OutputStream? = null
 
@@ -204,6 +297,13 @@ object Exporter {
                 Build.VERSION.SDK_INT >=
                 Build.VERSION_CODES.Q
             ) {
+
+                val safeName =
+                    uniqueMediaStoreFileName(
+                        context = context,
+                        baseName = safeBaseName,
+                        extension = "png"
+                    )
 
                 val values =
                     ContentValues().apply {
@@ -248,26 +348,34 @@ object Exporter {
                             "Unable to open image output stream."
                         )
 
-                bitmap.compress(
-                    Bitmap.CompressFormat.PNG,
-                    100,
-                    outputStream
-                )
+                val compressed =
+                    bitmap.compress(
+                        Bitmap.CompressFormat.PNG,
+                        100,
+                        outputStream
+                    )
+
+                if (!compressed) {
+                    throw IllegalStateException(
+                        "Unable to compress certificate image."
+                    )
+                }
 
                 outputStream.flush()
-
                 outputStream.close()
                 outputStream = null
 
-                values.clear()
-                values.put(
-                    MediaStore.Images.Media.IS_PENDING,
-                    0
-                )
+                val completedValues =
+                    ContentValues().apply {
+                        put(
+                            MediaStore.Images.Media.IS_PENDING,
+                            0
+                        )
+                    }
 
                 resolver.update(
                     uri,
-                    values,
+                    completedValues,
                     null,
                     null
                 )
@@ -283,9 +391,7 @@ object Exporter {
                         CERTIFICATE_FOLDER
                     )
 
-                if (!directory.exists()) {
-                    directory.mkdirs()
-                }
+                ensureDirectory(directory)
 
                 val file =
                     uniqueFileName(
@@ -297,20 +403,29 @@ object Exporter {
                 outputStream =
                     FileOutputStream(file)
 
-                bitmap.compress(
-                    Bitmap.CompressFormat.PNG,
-                    100,
-                    outputStream
-                )
+                val compressed =
+                    bitmap.compress(
+                        Bitmap.CompressFormat.PNG,
+                        100,
+                        outputStream
+                    )
+
+                if (!compressed) {
+                    throw IllegalStateException(
+                        "Unable to compress certificate image."
+                    )
+                }
 
                 outputStream.flush()
-
                 outputStream.close()
                 outputStream = null
 
                 /*
-                 * Legacy devices require a file URI.
-                 * For modern Android this branch is never used.
+                 * This URI is suitable for returning to the caller.
+                 *
+                 * If the returned URI is later shared on legacy Android,
+                 * use a FileProvider instead of directly putting this
+                 * file:// URI into an Intent.
                  */
                 uri =
                     Uri.fromFile(file)
@@ -328,9 +443,6 @@ object Exporter {
 
             e.printStackTrace()
 
-            /*
-             * Remove incomplete MediaStore item.
-             */
             if (uri != null) {
 
                 try {
@@ -386,13 +498,13 @@ object Exporter {
         try {
 
             /*
-             * Use a stable certificate page size rather than making
-             * PDF page dimensions equal to bitmap pixel dimensions.
-             *
-             * 3:2 aspect ratio.
+             * Stable 3:2 certificate PDF page.
              */
-            val pageWidth = 1200
-            val pageHeight = 800
+            val pageWidth =
+                1200
+
+            val pageHeight =
+                800
 
             val pageInfo =
                 PdfDocument.PageInfo.Builder(
@@ -423,12 +535,11 @@ object Exporter {
                     CERTIFICATE_ASPECT_RATIO
 
                 /*
-                 * Keep the entire certificate visible.
+                 * Preserve the complete certificate.
+                 * No cropping is performed.
                  */
                 val destination =
-                    if (
-                        sourceRatio > targetRatio
-                    ) {
+                    if (sourceRatio > targetRatio) {
 
                         val height =
                             pageWidth / sourceRatio
@@ -505,9 +616,6 @@ object Exporter {
         val safeBaseName =
             sanitizeFileName(fileName)
 
-        val safeName =
-            "$safeBaseName.pdf"
-
         var uri: Uri? = null
         var outputStream: OutputStream? = null
 
@@ -517,6 +625,13 @@ object Exporter {
                 Build.VERSION.SDK_INT >=
                 Build.VERSION_CODES.Q
             ) {
+
+                val safeName =
+                    uniqueMediaStoreFileName(
+                        context = context,
+                        baseName = safeBaseName,
+                        extension = "pdf"
+                    )
 
                 val values =
                     ContentValues().apply {
@@ -570,15 +685,17 @@ object Exporter {
                 outputStream.close()
                 outputStream = null
 
-                values.clear()
-                values.put(
-                    MediaStore.Downloads.IS_PENDING,
-                    0
-                )
+                val completedValues =
+                    ContentValues().apply {
+                        put(
+                            MediaStore.Downloads.IS_PENDING,
+                            0
+                        )
+                    }
 
                 resolver.update(
                     uri,
-                    values,
+                    completedValues,
                     null,
                     null
                 )
@@ -594,9 +711,7 @@ object Exporter {
                         CERTIFICATE_FOLDER
                     )
 
-                if (!directory.exists()) {
-                    directory.mkdirs()
-                }
+                ensureDirectory(directory)
 
                 val file =
                     uniqueFileName(
@@ -614,7 +729,6 @@ object Exporter {
                 )
 
                 outputStream.flush()
-
                 outputStream.close()
                 outputStream = null
 
@@ -691,8 +805,8 @@ object Exporter {
         val safeBaseName =
             sanitizeFileName(fileName)
 
-        var pdfDocument: PdfDocument? = null
         var outputStream: FileOutputStream? = null
+        var pdfFile: File? = null
 
         try {
 
@@ -702,15 +816,9 @@ object Exporter {
                     SHARED_CERTIFICATE_FOLDER
                 )
 
-            if (!cachePath.exists()) {
-                cachePath.mkdirs()
-            }
+            ensureDirectory(cachePath)
 
-            /*
-             * Use a unique name to prevent one certificate from
-             * overwriting another.
-             */
-            val pdfFile =
+            pdfFile =
                 uniqueFileName(
                     cachePath,
                     safeBaseName,
@@ -802,11 +910,6 @@ object Exporter {
                 outputStream?.close()
             } catch (_: Exception) {
             }
-
-            try {
-                pdfDocument?.close()
-            } catch (_: Exception) {
-            }
         }
     }
 
@@ -834,6 +937,11 @@ object Exporter {
 
             val csvBuilder =
                 StringBuilder()
+
+            /*
+             * UTF-8 BOM improves compatibility with Microsoft Excel.
+             */
+            csvBuilder.append('\uFEFF')
 
             val headers =
                 listOf(
@@ -909,9 +1017,7 @@ object Exporter {
                     SHARED_REPORT_FOLDER
                 )
 
-            if (!cachePath.exists()) {
-                cachePath.mkdirs()
-            }
+            ensureDirectory(cachePath)
 
             val timestamp =
                 SimpleDateFormat(
@@ -920,9 +1026,10 @@ object Exporter {
                 ).format(Date())
 
             val csvFile =
-                File(
+                uniqueFileName(
                     cachePath,
-                    "LGES_Certificates_Registry_$timestamp.csv"
+                    "LGES_Certificates_Registry_$timestamp",
+                    "csv"
                 )
 
             csvFile.writeText(

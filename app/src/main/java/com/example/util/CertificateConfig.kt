@@ -2,14 +2,11 @@ package com.example.util
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 /**
- * Central configuration and utility functions for certificate generation,
- * verification URLs, certificate IDs and CSV export.
- *
- * IMPORTANT:
- * Keep the public constant/function names unchanged because other parts
- * of the application depend on them.
+ * Central configuration and utility functions for certificate
+ * generation, verification URLs, certificate IDs and CSV export.
  */
 object CertificateConfig {
 
@@ -17,28 +14,12 @@ object CertificateConfig {
     // DEFAULT CONFIGURATION
     // ============================================================
 
-    /**
-     * Public certificate verification page.
-     *
-     * Example:
-     * https://lges-computer-classes.netlify.app/verify.html?certNo=LGES-101
-     */
     const val DEFAULT_BASE_VERIFICATION_URL =
         "https://lges-computer-classes.netlify.app/verify.html"
 
-    /**
-     * Main institute website.
-     */
     const val DEFAULT_INSTITUTE_WEBSITE =
         "https://lges-computer-classes.netlify.app/"
 
-    /**
-     * Google Apps Script Web App endpoint.
-     *
-     * This should normally be configurable from Settings rather than
-     * hard-coded in production. It is retained here for backward
-     * compatibility with the current application.
-     */
     const val DEFAULT_WEB_APP_URL =
         "https://script.google.com/macros/s/AKfycbxb9VlwWNXkJwjt1927Ju1bKWzaRdbXUZVvaS6jbLBQ-l9NUudXRVfq9lNchthpcIlm0g/exec"
 
@@ -49,36 +30,71 @@ object CertificateConfig {
     private const val CERTIFICATE_PREFIX = "LGES-"
 
     /**
-     * Creates the canonical certificate ID.
+     * Generates a genuinely unique certificate ID.
      *
-     * Examples:
+     * Certificate ID is intentionally NOT based on rollNo.
      *
-     * "101"             -> "LGES-101"
-     * " 101 "           -> "LGES-101"
-     * "LGES-101"        -> "LGES-101"
-     * "lges-101"        -> "LGES-101"
-     * " LGES-101 "      -> "LGES-101"
-     * "LGES-LGES-101"   -> "LGES-101"
+     * Example:
      *
-     * Blank input returns an empty string.
+     * LGES-2026-A1B2C3D4
+     *
+     * This allows the same student to receive:
+     *
+     * Course      -> LGES-2026-...
+     * Internship  -> LGES-2026-...
+     * Course 2    -> LGES-2026-...
      */
-    fun computeCertificateId(rollNo: String): String {
+    fun generateCertificateId(): String {
+
+        val year =
+            java.util.Calendar
+                .getInstance()
+                .get(java.util.Calendar.YEAR)
+
+        val uniquePart =
+            UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .uppercase(LocaleHolder.ROOT)
+                .take(12)
+
+        return "$CERTIFICATE_PREFIX$year-$uniquePart"
+    }
+
+    /**
+     * Legacy certificate ID generator.
+     *
+     * KEPT for backward compatibility with existing code/data.
+     *
+     * New certificates SHOULD use generateCertificateId().
+     *
+     * Example:
+     *
+     * 101       -> LGES-101
+     * LGES-101  -> LGES-101
+     */
+    fun computeCertificateId(
+        rollNo: String
+    ): String {
+
         var clean = rollNo.trim()
 
         if (clean.isBlank()) {
             return ""
         }
 
-        /*
-         * Remove repeated LGES- prefixes.
-         *
-         * This prevents malformed IDs such as:
-         * LGES-LGES-101
-         * lges-LGES-101
-         * LGES-lgES-101
-         */
-        while (clean.startsWith(CERTIFICATE_PREFIX, ignoreCase = true)) {
-            clean = clean.substring(CERTIFICATE_PREFIX.length).trim()
+        while (
+            clean.startsWith(
+                CERTIFICATE_PREFIX,
+                ignoreCase = true
+            )
+        ) {
+            clean =
+                clean
+                    .substring(
+                        CERTIFICATE_PREFIX.length
+                    )
+                    .trim()
         }
 
         if (clean.isBlank()) {
@@ -89,10 +105,20 @@ object CertificateConfig {
     }
 
     /**
-     * Checks whether a string already represents a valid LGES-style
-     * certificate ID.
+     * Checks whether the value looks like an LGES certificate ID.
+     *
+     * Supports both:
+     *
+     * Old:
+     * LGES-101
+     *
+     * New:
+     * LGES-2026-A1B2C3D4
      */
-    fun isCertificateId(value: String): Boolean {
+    fun isCertificateId(
+        value: String
+    ): Boolean {
+
         val clean = value.trim()
 
         if (clean.isBlank()) {
@@ -102,7 +128,10 @@ object CertificateConfig {
         return clean.startsWith(
             CERTIFICATE_PREFIX,
             ignoreCase = true
-        ) && clean.substring(CERTIFICATE_PREFIX.length).trim().isNotBlank()
+        ) &&
+            clean.substring(
+                CERTIFICATE_PREFIX.length
+            ).trim().isNotBlank()
     }
 
     // ============================================================
@@ -110,35 +139,18 @@ object CertificateConfig {
     // ============================================================
 
     /**
-     * Builds the public verification URL for a certificate.
+     * Builds:
      *
-     * Example:
-     *
-     * certificateId = "LGES-101"
-     *
-     * result:
-     * https://lges-computer-classes.netlify.app/verify.html?certNo=LGES-101
-     *
-     * Existing certNo parameters are replaced instead of duplicated.
-     * URL fragments are preserved correctly.
+     * verify.html?certNo=LGES-2026-A1B2C3D4
      */
     fun buildVerificationUrl(
         certificateId: String,
-        baseUrl: String = DEFAULT_BASE_VERIFICATION_URL
+        baseUrl: String =
+            DEFAULT_BASE_VERIFICATION_URL
     ): String {
 
         val cleanBase = baseUrl.trim()
 
-        /*
-         * If there is no certificate ID, return the cleaned base URL.
-         */
-        if (certificateId.isBlank()) {
-            return cleanBase
-        }
-
-        /*
-         * Empty base URL should fall back to the application default.
-         */
         val safeBase =
             if (cleanBase.isBlank()) {
                 DEFAULT_BASE_VERIFICATION_URL
@@ -146,69 +158,90 @@ object CertificateConfig {
                 cleanBase
             }
 
-        val encodedId = encodeQueryParameter(
-            computeCertificateId(certificateId)
-        )
+        if (certificateId.isBlank()) {
+            return safeBase
+        }
 
         /*
-         * Separate fragment because query parameters must appear
-         * before '#fragment'.
+         * If certificateId is already a certificate ID,
+         * preserve it instead of treating it as a roll number.
          *
-         * Example:
-         *
-         * verify.html#top
-         *
-         * must become:
-         *
-         * verify.html?certNo=LGES-101#top
+         * This is important now that IDs are independent
+         * from roll numbers.
          */
-        val fragmentIndex = safeBase.indexOf('#')
+        val cleanCertificateId =
+            certificateId.trim()
+
+        val encodedId =
+            encodeQueryParameter(
+                cleanCertificateId
+            )
+
+        /*
+         * Separate URL fragment.
+         */
+        val fragmentIndex =
+            safeBase.indexOf('#')
 
         val urlWithoutFragment: String
+
         val fragment: String
 
         if (fragmentIndex >= 0) {
-            urlWithoutFragment = safeBase.substring(0, fragmentIndex)
-            fragment = safeBase.substring(fragmentIndex)
+
+            urlWithoutFragment =
+                safeBase.substring(
+                    0,
+                    fragmentIndex
+                )
+
+            fragment =
+                safeBase.substring(
+                    fragmentIndex
+                )
+
         } else {
+
             urlWithoutFragment = safeBase
             fragment = ""
         }
 
-        /*
-         * Remove an existing certNo query parameter so that we don't
-         * generate:
-         *
-         * ?certNo=OLD&certNo=NEW
-         *
-         * or:
-         *
-         * ?foo=1&certNo=OLD&certNo=NEW
-         */
-        val cleanedQueryUrl = removeQueryParameter(
-            urlWithoutFragment,
-            "certNo"
-        )
+        val cleanedQueryUrl =
+            removeQueryParameter(
+                urlWithoutFragment,
+                "certNo"
+            )
 
         val separator =
             when {
-                cleanedQueryUrl.contains('?') &&
-                        !cleanedQueryUrl.endsWith('?') &&
-                        !cleanedQueryUrl.endsWith('&') -> "&"
 
-                cleanedQueryUrl.endsWith('?') ||
-                        cleanedQueryUrl.endsWith('&') -> ""
+                cleanedQueryUrl.contains("?") &&
+                    !cleanedQueryUrl.endsWith("?") &&
+                    !cleanedQueryUrl.endsWith("&") -> {
+                    "&"
+                }
 
-                else -> "?"
+                cleanedQueryUrl.endsWith("?") ||
+                    cleanedQueryUrl.endsWith("&") -> {
+                    ""
+                }
+
+                else -> {
+                    "?"
+                }
             }
 
-        return "$cleanedQueryUrl${separator}certNo=$encodedId$fragment"
+        return "$cleanedQueryUrl" +
+            "${separator}certNo=$encodedId$fragment"
     }
 
     /**
-     * URL-encodes a query parameter using UTF-8.
+     * UTF-8 query parameter encoding.
      */
-    private fun encodeQueryParameter(value: String): String {
+    private fun encodeQueryParameter(
+        value: String
+    ): String {
+
         return URLEncoder.encode(
             value,
             StandardCharsets.UTF_8.name()
@@ -216,51 +249,66 @@ object CertificateConfig {
     }
 
     /**
-     * Removes one or more occurrences of a query parameter.
-     *
-     * This deliberately works without Android Uri so CertificateConfig
-     * remains easy to unit-test as a normal Kotlin/JVM utility.
+     * Removes a query parameter from a URL.
      */
     private fun removeQueryParameter(
         url: String,
         parameterName: String
     ): String {
 
-        val questionMarkIndex = url.indexOf('?')
+        val questionMarkIndex =
+            url.indexOf('?')
 
         if (questionMarkIndex < 0) {
             return url
         }
 
-        val basePart = url.substring(0, questionMarkIndex)
-        val queryPart = url.substring(questionMarkIndex + 1)
+        val basePart =
+            url.substring(
+                0,
+                questionMarkIndex
+            )
+
+        val queryPart =
+            url.substring(
+                questionMarkIndex + 1
+            )
 
         if (queryPart.isBlank()) {
             return basePart
         }
 
-        val filteredParameters = queryPart
-            .split('&')
-            .filter { parameter ->
-                val equalsIndex = parameter.indexOf('=')
+        val filteredParameters =
+            queryPart
+                .split('&')
+                .filter { parameter ->
 
-                val key =
-                    if (equalsIndex >= 0) {
-                        parameter.substring(0, equalsIndex)
-                    } else {
-                        parameter
-                    }
+                    val equalsIndex =
+                        parameter.indexOf('=')
 
-                !key.equals(
-                    parameterName,
-                    ignoreCase = true
-                )
-            }
+                    val key =
+                        if (equalsIndex >= 0) {
+                            parameter.substring(
+                                0,
+                                equalsIndex
+                            )
+                        } else {
+                            parameter
+                        }
 
-        return if (filteredParameters.isEmpty()) {
+                    !key.equals(
+                        parameterName,
+                        ignoreCase = true
+                    )
+                }
+
+        return if (
+            filteredParameters.isEmpty()
+        ) {
             basePart
         } else {
-            "$basePart?${filteredParameters.joinToString("&")}"
+            "$basePart?" +
+                filteredParameters.joinToString("&")
         }
     }
 
@@ -268,46 +316,36 @@ object CertificateConfig {
     // URL VALIDATION / NORMALIZATION
     // ============================================================
 
-    /**
-     * Basic validation for URLs used by the application.
-     *
-     * This intentionally performs lightweight validation instead of
-     * attempting a network request.
-     */
-    fun isValidHttpUrl(url: String): Boolean {
+    fun isValidHttpUrl(
+        url: String
+    ): Boolean {
+
         val clean = url.trim()
 
         return clean.startsWith(
             "https://",
             ignoreCase = true
-        ) || clean.startsWith(
-            "http://",
-            ignoreCase = true
-        )
+        ) ||
+            clean.startsWith(
+                "http://",
+                ignoreCase = true
+            )
     }
 
-    /**
-     * Normalizes a configured URL.
-     *
-     * - trims whitespace
-     * - removes unnecessary trailing whitespace
-     * - preserves query strings/fragments
-     *
-     * No aggressive slash manipulation is performed because changing
-     * slashes can break paths or deployed endpoints.
-     */
-    fun normalizeUrl(url: String): String {
+    fun normalizeUrl(
+        url: String
+    ): String {
         return url.trim()
     }
 
-    /**
-     * Returns the configured verification URL or the application default
-     * when the supplied URL is blank.
-     */
     fun getSafeVerificationBaseUrl(
         configuredUrl: String?
     ): String {
-        val clean = configuredUrl?.trim().orEmpty()
+
+        val clean =
+            configuredUrl
+                ?.trim()
+                .orEmpty()
 
         return if (
             clean.isNotBlank() &&
@@ -319,13 +357,14 @@ object CertificateConfig {
         }
     }
 
-    /**
-     * Returns the configured Google Apps Script URL or the default endpoint.
-     */
     fun getSafeWebAppUrl(
         configuredUrl: String?
     ): String {
-        val clean = configuredUrl?.trim().orEmpty()
+
+        val clean =
+            configuredUrl
+                ?.trim()
+                .orEmpty()
 
         return if (
             clean.isNotBlank() &&
@@ -343,30 +382,33 @@ object CertificateConfig {
 
     /**
      * RFC 4180-compatible CSV escaping.
-     *
-     * Example:
-     *
-     * John Smith
-     * ->
-     * "John Smith"
-     *
-     * John "Rocky" Smith
-     * ->
-     * "John ""Rocky"" Smith"
      */
-    fun escapeCsv(value: String): String {
-        val escaped = value.replace(
-            "\"",
-            "\"\""
-        )
+    fun escapeCsv(
+        value: String
+    ): String {
+
+        val escaped =
+            value.replace(
+                "\"",
+                "\"\""
+            )
 
         return "\"$escaped\""
     }
 
+    fun escapeCsvNullable(
+        value: String?
+    ): String {
+        return escapeCsv(
+            value.orEmpty()
+        )
+    }
+
     /**
-     * Null-safe CSV escaping helper.
+     * Small locale holder so ID generation doesn't depend on
+     * the device's language/region.
      */
-    fun escapeCsvNullable(value: String?): String {
-        return escapeCsv(value.orEmpty())
+    private object LocaleHolder {
+        val ROOT = java.util.Locale.ROOT
     }
 }

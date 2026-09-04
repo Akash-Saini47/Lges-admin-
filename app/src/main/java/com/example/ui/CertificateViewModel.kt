@@ -34,17 +34,18 @@ data class FormValidationErrors(
     val hasErrors: Boolean
         get() =
             rollNoError != null ||
-            studentNameError != null ||
-            fatherNameError != null ||
-            courseNameError != null ||
-            dateOfIssueError != null
+                    studentNameError != null ||
+                    fatherNameError != null ||
+                    courseNameError != null ||
+                    dateOfIssueError != null
 }
 
 class CertificateViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
-    private val appContext = application.applicationContext
+    private val appContext =
+        application.applicationContext
 
     private val sharedPrefs =
         appContext.getSharedPreferences(
@@ -61,10 +62,12 @@ class CertificateViewModel(
     // ============================================================
 
     /**
-     * Keeps the original certificate ID while editing.
+     * IMPORTANT:
      *
-     * This prevents changing a roll number during editing from
-     * accidentally creating a completely new certificate ID.
+     * This is the ONLY identifier used to determine which
+     * certificate is being edited.
+     *
+     * Roll number is deliberately NOT used as certificate identity.
      */
     private val editingCertificateId =
         MutableStateFlow<String?>(null)
@@ -73,20 +76,26 @@ class CertificateViewModel(
     // FORM STATE
     // ============================================================
 
-    val rollNo = MutableStateFlow("")
+    val rollNo =
+        MutableStateFlow("")
 
-    val studentName = MutableStateFlow("")
+    val studentName =
+        MutableStateFlow("")
 
     val relationPrefix =
         MutableStateFlow("S/O")
 
-    val fatherName = MutableStateFlow("")
+    val fatherName =
+        MutableStateFlow("")
 
-    val courseName = MutableStateFlow("")
+    val courseName =
+        MutableStateFlow("")
 
-    val sessionRange = MutableStateFlow("")
+    val sessionRange =
+        MutableStateFlow("")
 
-    val duration = MutableStateFlow("")
+    val duration =
+        MutableStateFlow("")
 
     val grade =
         MutableStateFlow("A")
@@ -106,15 +115,23 @@ class CertificateViewModel(
         MutableStateFlow("Course")
 
     // ============================================================
-    // VALIDATION
+    // VALIDATION STATE
     // ============================================================
 
     private val _validationErrors =
-        MutableStateFlow(FormValidationErrors())
+        MutableStateFlow(
+            FormValidationErrors()
+        )
 
     val validationErrors =
         _validationErrors.asStateFlow()
 
+    /**
+     * Informational notice only.
+     *
+     * A duplicate roll number DOES NOT automatically mean
+     * "update this certificate".
+     */
     private val _duplicateNote =
         MutableStateFlow<String?>(null)
 
@@ -182,8 +199,11 @@ class CertificateViewModel(
     // ============================================================
 
     init {
+
         val database =
-            CertificateDatabase.getDatabase(appContext)
+            CertificateDatabase.getDatabase(
+                appContext
+            )
 
         repository =
             CertificateRepository(
@@ -193,7 +213,10 @@ class CertificateViewModel(
         allCertificates =
             repository.allCertificates.stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
+                started =
+                    SharingStarted.WhileSubscribed(
+                        5000
+                    ),
                 initialValue = emptyList()
             )
     }
@@ -202,30 +225,51 @@ class CertificateViewModel(
     // SETTINGS
     // ============================================================
 
-    fun updateWebAppUrl(url: String) {
-        val clean = url.trim()
+    fun updateWebAppUrl(
+        url: String
+    ) {
 
-        webAppUrl.value = clean
+        val clean =
+            url.trim()
+
+        webAppUrl.value =
+            clean
 
         sharedPrefs.edit()
-            .putString("web_app_url", clean)
+            .putString(
+                "web_app_url",
+                clean
+            )
             .apply()
     }
 
-    fun updateApiKey(key: String) {
-        val clean = key.trim()
+    fun updateApiKey(
+        key: String
+    ) {
 
-        apiKey.value = clean
+        val clean =
+            key.trim()
+
+        apiKey.value =
+            clean
 
         sharedPrefs.edit()
-            .putString("api_key", clean)
+            .putString(
+                "api_key",
+                clean
+            )
             .apply()
     }
 
-    fun updateVerificationBaseUrl(url: String) {
-        val clean = url.trim()
+    fun updateVerificationBaseUrl(
+        url: String
+    ) {
 
-        verificationBaseUrl.value = clean
+        val clean =
+            url.trim()
+
+        verificationBaseUrl.value =
+            clean
 
         sharedPrefs.edit()
             .putString(
@@ -236,6 +280,7 @@ class CertificateViewModel(
     }
 
     fun resetSettingsToDefault() {
+
         updateWebAppUrl(
             CertificateConfig.DEFAULT_WEB_APP_URL
         )
@@ -248,32 +293,45 @@ class CertificateViewModel(
     }
 
     // ============================================================
-    // DUPLICATE CHECK
+    // DUPLICATE ROLL NUMBER CHECK
     // ============================================================
 
+    /**
+     * Checks whether another certificate already uses the same
+     * roll number.
+     *
+     * IMPORTANT:
+     *
+     * This function NEVER changes the certificate being updated.
+     *
+     * A duplicate roll number is only an informational warning.
+     */
     fun checkForDuplicateRollNo(
         inputRoll: String
     ) {
+
         val clean =
             inputRoll.trim()
 
         if (clean.isBlank()) {
-            _duplicateNote.value = null
+
+            _duplicateNote.value =
+                null
+
             return
         }
-
-        val certId =
-            CertificateConfig.computeCertificateId(clean)
 
         val currentEditingId =
             editingCertificateId.value
 
-        val existing =
-            allCertificates.value.firstOrNull { certificate ->
+        val existingCertificates =
+            allCertificates.value.filter { certificate ->
 
                 /*
-                 * Do not treat the currently edited record as
-                 * a duplicate of itself.
+                 * Exclude the certificate currently being edited.
+                 *
+                 * If we are editing LGES-101 and its roll number
+                 * is 101, it must not warn about itself.
                  */
                 if (
                     currentEditingId != null &&
@@ -284,37 +342,39 @@ class CertificateViewModel(
                 ) {
                     false
                 } else {
-                    certificate.rollNo.equals(
-                        clean,
-                        ignoreCase = true
-                    ) ||
-                    certificate.certificateId.equals(
-                        certId,
-                        ignoreCase = true
-                    )
+                    certificate.rollNo.trim()
+                        .equals(
+                            clean,
+                            ignoreCase = true
+                        )
                 }
             }
+
+        val existing =
+            existingCertificates.firstOrNull()
 
         if (existing != null) {
 
             _duplicateNote.value =
-                "Notice: Record exists for '${existing.studentName}' " +
-                "(${existing.certificateId}). " +
-                "Saving will update the existing entry."
+                "Notice: Roll No. '$clean' is already used by " +
+                        "${existing.studentName} " +
+                        "(${existing.certificateId}). " +
+                        "A new certificate will remain a separate record."
 
         } else if (currentEditingId != null) {
 
             _duplicateNote.value =
-                "Editing existing certificate $currentEditingId"
+                "Editing certificate $currentEditingId"
 
         } else {
 
-            _duplicateNote.value = null
+            _duplicateNote.value =
+                null
         }
     }
 
     // ============================================================
-    // VALIDATION
+    // FORM VALIDATION
     // ============================================================
 
     fun validateForm(): Boolean {
@@ -341,11 +401,13 @@ class CertificateViewModel(
             dateOfIssue.value.trim()
 
         if (roll.isEmpty()) {
+
             rollError =
                 "Roll No. / Certificate No. is required"
         }
 
         if (student.isEmpty()) {
+
             nameError =
                 "Student Name is required"
         }
@@ -357,27 +419,39 @@ class CertificateViewModel(
             ) &&
             father.isEmpty()
         ) {
+
             fatherError =
                 "Father / Guardian Name is required for Course certificates"
         }
 
         if (course.isEmpty()) {
+
             courseError =
                 "Course / Internship title is required"
         }
 
         if (date.isEmpty()) {
+
             dateError =
                 "Date of Issue is required"
         }
 
         val errors =
             FormValidationErrors(
-                rollNoError = rollError,
-                studentNameError = nameError,
-                fatherNameError = fatherError,
-                courseNameError = courseError,
-                dateOfIssueError = dateError
+                rollNoError =
+                    rollError,
+
+                studentNameError =
+                    nameError,
+
+                fatherNameError =
+                    fatherError,
+
+                courseNameError =
+                    courseError,
+
+                dateOfIssueError =
+                    dateError
             )
 
         _validationErrors.value =
@@ -394,6 +468,13 @@ class CertificateViewModel(
         cert: Certificate
     ) {
 
+        /*
+         * CRITICAL:
+         *
+         * Store the exact certificate ID.
+         *
+         * We do NOT store the old roll number as the identity.
+         */
         editingCertificateId.value =
             cert.certificateId
 
@@ -412,7 +493,10 @@ class CertificateViewModel(
                 "S/O ",
                 ignoreCase = true
             ) -> {
-                relationPrefix.value = "S/O"
+
+                relationPrefix.value =
+                    "S/O"
+
                 fatherName.value =
                     rawFather
                         .substring(4)
@@ -423,7 +507,10 @@ class CertificateViewModel(
                 "D/O ",
                 ignoreCase = true
             ) -> {
-                relationPrefix.value = "D/O"
+
+                relationPrefix.value =
+                    "D/O"
+
                 fatherName.value =
                     rawFather
                         .substring(4)
@@ -434,7 +521,10 @@ class CertificateViewModel(
                 "W/O ",
                 ignoreCase = true
             ) -> {
-                relationPrefix.value = "W/O"
+
+                relationPrefix.value =
+                    "W/O"
+
                 fatherName.value =
                     rawFather
                         .substring(4)
@@ -442,6 +532,7 @@ class CertificateViewModel(
             }
 
             else -> {
+
                 fatherName.value =
                     rawFather
             }
@@ -457,7 +548,9 @@ class CertificateViewModel(
             cert.duration
 
         grade.value =
-            cert.grade.ifBlank { "A" }
+            cert.grade.ifBlank {
+                "A"
+            }
 
         placeOfIssue.value =
             cert.placeOfIssue.ifBlank {
@@ -468,7 +561,9 @@ class CertificateViewModel(
             cert.dateOfIssue
 
         certType.value =
-            cert.certType
+            cert.certType.ifBlank {
+                "Course"
+            }
 
         _validationErrors.value =
             FormValidationErrors()
@@ -485,23 +580,33 @@ class CertificateViewModel(
 
     fun clearForm() {
 
+        /*
+         * Setting this to null switches the next save into
+         * CREATE mode instead of EDIT mode.
+         */
         editingCertificateId.value =
             null
 
-        rollNo.value = ""
+        rollNo.value =
+            ""
 
-        studentName.value = ""
+        studentName.value =
+            ""
 
         relationPrefix.value =
             "S/O"
 
-        fatherName.value = ""
+        fatherName.value =
+            ""
 
-        courseName.value = ""
+        courseName.value =
+            ""
 
-        sessionRange.value = ""
+        sessionRange.value =
+            ""
 
-        duration.value = ""
+        duration.value =
+            ""
 
         grade.value =
             "A"
@@ -528,8 +633,12 @@ class CertificateViewModel(
     }
 
     fun clearUploadStatus() {
-        _uploadStatus.value = null
-        _uploadError.value = null
+
+        _uploadStatus.value =
+            null
+
+        _uploadError.value =
+            null
     }
 
     // ============================================================
@@ -551,20 +660,30 @@ class CertificateViewModel(
                     "S/O ",
                     ignoreCase = true
                 ) ||
-                rawFather.startsWith(
-                    "D/O ",
-                    ignoreCase = true
-                ) ||
-                rawFather.startsWith(
-                    "W/O ",
-                    ignoreCase = true
-                ) ->
+                        rawFather.startsWith(
+                            "D/O ",
+                            ignoreCase = true
+                        ) ||
+                        rawFather.startsWith(
+                            "W/O ",
+                            ignoreCase = true
+                        ) ->
                     rawFather
 
                 else ->
                     "${relationPrefix.value} $rawFather"
             }
 
+        /*
+         * CREATE MODE:
+         *
+         * Certificate.create() generates a new certificate ID
+         * from the roll number.
+         *
+         * EDIT MODE:
+         *
+         * customId preserves the existing certificate ID.
+         */
         return Certificate.create(
 
             rollNo =
@@ -595,12 +714,13 @@ class CertificateViewModel(
                 dateOfIssue.value.trim(),
 
             certType =
-                certType.value,
+                certType.value.trim()
+                    .ifBlank {
+                        "Course"
+                    },
 
             /*
-             * CRITICAL:
-             *
-             * Preserve the existing certificate ID during edit.
+             * This is the critical multiple-certificate behavior.
              */
             customId =
                 editingCertificateId.value
@@ -620,11 +740,22 @@ class CertificateViewModel(
 
             val firstError =
                 listOfNotNull(
-                    validationErrors.value.rollNoError,
-                    validationErrors.value.studentNameError,
-                    validationErrors.value.fatherNameError,
-                    validationErrors.value.courseNameError,
-                    validationErrors.value.dateOfIssueError
+
+                    validationErrors.value
+                        .rollNoError,
+
+                    validationErrors.value
+                        .studentNameError,
+
+                    validationErrors.value
+                        .fatherNameError,
+
+                    validationErrors.value
+                        .courseNameError,
+
+                    validationErrors.value
+                        .dateOfIssueError
+
                 ).firstOrNull()
                     ?: "Please fix the required form errors."
 
@@ -636,54 +767,113 @@ class CertificateViewModel(
         val cert =
             getAsCertificate()
 
+        /*
+         * Capture this BEFORE launching the coroutine.
+         *
+         * This tells us whether the user is editing an existing
+         * certificate or creating a completely new one.
+         */
+        val isEditing =
+            editingCertificateId.value != null
+
         viewModelScope.launch {
 
             try {
 
-                val result =
+                val isUpdate =
                     withContext(Dispatchers.IO) {
 
-                        val existing =
-                            repository.getById(
-                                cert.certificateId
-                            )
-                                ?: repository.getByRollNo(
-                                    cert.rollNo
+                        if (isEditing) {
+
+                            /*
+                             * EDIT MODE
+                             *
+                             * Only certificateId determines which
+                             * record is being updated.
+                             *
+                             * NEVER search by roll number here.
+                             */
+                            val existing =
+                                repository.getById(
+                                    cert.certificateId
                                 )
 
-                        val isUpdate =
-                            existing != null
+                            if (existing == null) {
 
-                        repository.insert(cert)
+                                throw IllegalStateException(
+                                    "The certificate being edited no longer exists."
+                                )
+                            }
 
-                        isUpdate
+                            repository.update(
+                                cert.copy(
+                                    /*
+                                     * Preserve the original
+                                     * synchronization state until
+                                     * cloud sync completes.
+                                     */
+                                    isSynced = false
+                                )
+                            )
+
+                            true
+
+                        } else {
+
+                            /*
+                             * CREATE MODE
+                             *
+                             * This is ALWAYS a new certificate.
+                             *
+                             * We intentionally do NOT call
+                             * getByRollNo() here.
+                             *
+                             * Therefore:
+                             *
+                             * Rahul / Roll 101 / Course
+                             * Rahul / Roll 205 / Internship
+                             *
+                             * can coexist.
+                             */
+                            repository.insert(
+                                cert
+                            )
+
+                            false
+                        }
                     }
 
                 /*
-                 * Report local save success first.
+                 * Local database save succeeded.
                  */
-                onSuccess(result)
+                onSuccess(
+                    isUpdate
+                )
 
                 /*
-                 * Then perform optional cloud sync.
+                 * Cloud synchronization happens AFTER local save.
                  *
-                 * This is intentionally not nested inside another
-                 * viewModelScope.launch.
+                 * A cloud failure does not destroy the local record.
                  */
                 if (
                     webAppUrl.value
                         .trim()
                         .isNotBlank()
                 ) {
-                    syncCertificateWithSheets(cert)
+
+                    syncCertificateWithSheets(
+                        cert
+                    )
                 }
 
             } catch (e: Exception) {
 
                 onError(
                     "Failed to save certificate: " +
-                    (e.localizedMessage
-                        ?: "Database error")
+                            (
+                                e.localizedMessage
+                                    ?: "Database error"
+                                )
                 )
             }
         }
@@ -693,6 +883,16 @@ class CertificateViewModel(
     // DELETE
     // ============================================================
 
+    /**
+     * Deletes a certificate.
+     *
+     * Preferred input:
+     * certificateId
+     *
+     * A roll number is still accepted for backward compatibility,
+     * but the method tries to resolve it to an actual certificate
+     * before deleting.
+     */
     fun deleteCertificate(
         certificateIdOrRollNo: String,
         onSuccess: () -> Unit = {},
@@ -703,9 +903,11 @@ class CertificateViewModel(
             certificateIdOrRollNo.trim()
 
         if (input.isBlank()) {
+
             onError(
                 "Certificate ID or Roll No. is required."
             )
+
             return
         }
 
@@ -713,32 +915,53 @@ class CertificateViewModel(
 
             try {
 
-                val certId =
-                    CertificateConfig
-                        .computeCertificateId(input)
+                val certificateToDelete =
+                    withContext(Dispatchers.IO) {
+
+                        /*
+                         * First treat the supplied value as a
+                         * certificate ID.
+                         */
+                        repository.getById(
+                            input
+                        )
+                            /*
+                             * For backward compatibility, try
+                             * roll number as a fallback.
+                             */
+                            ?: repository.getByRollNo(
+                                input
+                            )
+                    }
+
+                if (certificateToDelete == null) {
+
+                    onError(
+                        "Certificate not found: $input"
+                    )
+
+                    return@launch
+                }
+
+                val actualCertificateId =
+                    certificateToDelete.certificateId
 
                 withContext(Dispatchers.IO) {
 
                     /*
-                     * Try both forms because the UI may supply
-                     * either certificate ID or roll number.
+                     * Delete EXACTLY one certificate by its primary key.
+                     *
+                     * This is safer than deleting by roll number because
+                     * a student can have multiple certificates.
                      */
-                    repository.delete(input)
-
-                    if (
-                        !input.equals(
-                            certId,
-                            ignoreCase = true
-                        )
-                    ) {
-                        repository.delete(certId)
-                    }
+                    repository.deleteById(
+                        actualCertificateId
+                    )
                 }
 
                 /*
-                 * Remote deletion is attempted separately.
-                 *
-                 * Local deletion has already succeeded.
+                 * Remote deletion uses the actual certificate ID,
+                 * never the roll number.
                  */
                 if (
                     webAppUrl.value
@@ -746,28 +969,41 @@ class CertificateViewModel(
                         .isNotBlank()
                 ) {
 
-                    try {
+                    val remoteResult =
+                        try {
 
-                        GoogleSheetsService
-                            .deleteCertificateRemotely(
-                                webAppUrl =
-                                    webAppUrl.value.trim(),
+                            GoogleSheetsService
+                                .deleteCertificateRemotely(
+                                    webAppUrl =
+                                        webAppUrl.value.trim(),
 
-                                certificateId =
-                                    certId,
+                                    certificateId =
+                                        actualCertificateId,
 
-                                apiKey =
-                                    apiKey.value.trim()
+                                    apiKey =
+                                        apiKey.value.trim()
+                                )
+
+                        } catch (remoteError: Exception) {
+
+                            SyncResult.Error(
+                                "Remote deletion failed: " +
+                                        (
+                                            remoteError.localizedMessage
+                                                ?: "Unknown cloud error"
+                                            ),
+                                remoteError
                             )
+                        }
 
-                    } catch (remoteError: Exception) {
+                    if (
+                        remoteResult is
+                        SyncResult.Error
+                    ) {
 
                         _uploadError.value =
                             "Deleted locally, but remote deletion failed: " +
-                            (
-                                remoteError.localizedMessage
-                                    ?: "Unknown cloud error"
-                            )
+                                    remoteResult.message
                     }
                 }
 
@@ -777,10 +1013,10 @@ class CertificateViewModel(
 
                 onError(
                     "Failed to delete certificate: " +
-                    (
-                        e.localizedMessage
-                            ?: "Database error"
-                    )
+                            (
+                                e.localizedMessage
+                                    ?: "Database error"
+                                )
                 )
             }
         }
@@ -803,7 +1039,9 @@ class CertificateViewModel(
         val cert =
             getAsCertificate()
 
-        syncCertificateWithSheets(cert)
+        syncCertificateWithSheets(
+            cert
+        )
     }
 
     // ============================================================
@@ -825,7 +1063,22 @@ class CertificateViewModel(
 
             _uploadError.value =
                 "Google Sheets Web App URL is not set. " +
-                "Go to Settings to configure it."
+                        "Go to Settings to configure it."
+
+            return
+        }
+
+        /*
+         * Validate the endpoint before starting a network request.
+         */
+        if (
+            !CertificateConfig.isValidHttpUrl(
+                url
+            )
+        ) {
+
+            _uploadError.value =
+                "Invalid Google Sheets Web App URL."
 
             return
         }
@@ -846,13 +1099,24 @@ class CertificateViewModel(
                 val result =
                     withContext(Dispatchers.IO) {
 
-                        GoogleSheetsService.syncCertificate(
-                            webAppUrl = url,
-                            certificate = cert,
-                            apiKey = apiKey.value.trim(),
-                            verificationBaseUrl =
-                                verificationBaseUrl.value.trim()
-                        )
+                        GoogleSheetsService
+                            .syncCertificate(
+
+                                webAppUrl =
+                                    url,
+
+                                certificate =
+                                    cert,
+
+                                apiKey =
+                                    apiKey.value.trim(),
+
+                                verificationBaseUrl =
+                                    CertificateConfig
+                                        .getSafeVerificationBaseUrl(
+                                            verificationBaseUrl.value
+                                        )
+                            )
                     }
 
                 when (result) {
@@ -866,14 +1130,17 @@ class CertificateViewModel(
                             null
 
                         /*
-                         * Only mark local record as synced
-                         * after successful remote sync.
+                         * Mark ONLY this exact certificate
+                         * as synchronized.
                          */
                         withContext(Dispatchers.IO) {
 
                             repository.updateSyncStatus(
-                                cert.certificateId,
-                                true
+                                certificateId =
+                                    cert.certificateId,
+
+                                isSynced =
+                                    true
                             )
                         }
                     }
@@ -895,10 +1162,10 @@ class CertificateViewModel(
 
                 _uploadError.value =
                     "Google Sheets sync failed: " +
-                    (
-                        e.localizedMessage
-                            ?: "Unknown error"
-                    )
+                            (
+                                e.localizedMessage
+                                    ?: "Unknown error"
+                                )
 
             } finally {
 
@@ -913,7 +1180,10 @@ class CertificateViewModel(
     // ============================================================
 
     fun testConnection(
-        onResult: (Boolean, String) -> Unit
+        onResult: (
+            Boolean,
+            String
+        ) -> Unit
     ) {
 
         val url =
@@ -924,6 +1194,20 @@ class CertificateViewModel(
             onResult(
                 false,
                 "Please enter a Web App URL first."
+            )
+
+            return
+        }
+
+        if (
+            !CertificateConfig.isValidHttpUrl(
+                url
+            )
+        ) {
+
+            onResult(
+                false,
+                "Please enter a valid HTTP/HTTPS Web App URL."
             )
 
             return
@@ -943,25 +1227,33 @@ class CertificateViewModel(
                 val result =
                     withContext(Dispatchers.IO) {
 
-                        GoogleSheetsService.testConnection(
-                            url,
-                            apiKey.value.trim()
-                        )
+                        GoogleSheetsService
+                            .testConnection(
+                                webAppUrl =
+                                    url,
+
+                                apiKey =
+                                    apiKey.value.trim()
+                            )
                     }
 
                 when (result) {
 
-                    is SyncResult.Success ->
+                    is SyncResult.Success -> {
+
                         onResult(
                             true,
                             result.message
                         )
+                    }
 
-                    is SyncResult.Error ->
+                    is SyncResult.Error -> {
+
                         onResult(
                             false,
                             result.message
                         )
+                    }
                 }
 
             } catch (e: Exception) {
@@ -969,10 +1261,10 @@ class CertificateViewModel(
                 onResult(
                     false,
                     "Connection test failed: " +
-                    (
-                        e.localizedMessage
-                            ?: "Unknown error"
-                    )
+                            (
+                                e.localizedMessage
+                                    ?: "Unknown error"
+                                )
                 )
 
             } finally {
@@ -1009,7 +1301,7 @@ class CertificateViewModel(
             }
 
             throw IllegalArgumentException(
-                "Unknown ViewModel class"
+                "Unknown ViewModel class: ${modelClass.name}"
             )
         }
     }
