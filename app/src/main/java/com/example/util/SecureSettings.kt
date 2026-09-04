@@ -62,8 +62,8 @@ class SecureSettings(context: Context) {
                 keyGen.init(spec)
                 keyGen.generateKey()
             }
-        } catch (e: Exception) {
-            AppLogger.w("SecureSettings", "Failed to initialize AndroidKeyStore key: ${e.message}")
+        } catch (t: Throwable) {
+            AppLogger.w("SecureSettings", "Failed to initialize AndroidKeyStore key: ${t.message}")
         }
     }
 
@@ -154,19 +154,23 @@ class SecureSettings(context: Context) {
     }
 
     private fun migrateLegacyPlaintextPrefs(context: Context) {
-        val legacyPrefs = context.getSharedPreferences("lges_admin_prefs", Context.MODE_PRIVATE)
-        val legacyApiKey = legacyPrefs.getString("api_key", null)
-        if (!legacyApiKey.isNullOrBlank() && !prefs.contains(PREF_API_KEY_ENC)) {
-            saveApiKey(legacyApiKey)
-            legacyPrefs.edit().remove("api_key").apply()
-        }
-        val legacyWebApp = legacyPrefs.getString("web_app_url", null)
-        if (!legacyWebApp.isNullOrBlank() && !prefs.contains(PREF_WEB_APP_URL)) {
-            saveWebAppUrl(legacyWebApp)
-        }
-        val legacyVerify = legacyPrefs.getString("verification_base_url", null)
-        if (!legacyVerify.isNullOrBlank() && !prefs.contains(PREF_VERIFICATION_URL)) {
-            saveVerificationBaseUrl(legacyVerify)
+        try {
+            val legacyPrefs = context.getSharedPreferences("lges_admin_prefs", Context.MODE_PRIVATE)
+            val legacyApiKey = legacyPrefs.getString("api_key", null)
+            if (!legacyApiKey.isNullOrBlank() && !prefs.contains(PREF_API_KEY_ENC)) {
+                saveApiKey(legacyApiKey)
+                legacyPrefs.edit().remove("api_key").apply()
+            }
+            val legacyWebApp = legacyPrefs.getString("web_app_url", null)
+            if (!legacyWebApp.isNullOrBlank() && !prefs.contains(PREF_WEB_APP_URL)) {
+                saveWebAppUrl(legacyWebApp)
+            }
+            val legacyVerify = legacyPrefs.getString("verification_base_url", null)
+            if (!legacyVerify.isNullOrBlank() && !prefs.contains(PREF_VERIFICATION_URL)) {
+                saveVerificationBaseUrl(legacyVerify)
+            }
+        } catch (t: Throwable) {
+            AppLogger.w("SecureSettings", "Legacy prefs migration skipped: ${t.message}")
         }
     }
 }

@@ -153,6 +153,7 @@ abstract class CertificateDatabase : RoomDatabase() {
                         MIGRATION_2_3,
                         MIGRATION_3_4
                     )
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also {
                         INSTANCE = it
