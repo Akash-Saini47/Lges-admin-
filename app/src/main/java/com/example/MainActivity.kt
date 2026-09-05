@@ -179,11 +179,14 @@ fun StartupErrorRecoveryScreen(
 
         Button(
             onClick = onResetAndRestart,
-            colors = ButtonDefaults.buttonColors(containerColor = LgesNavy),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = LgesNavy,
+                contentColor = Color.White
+            ),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
-            Text("Reset App Cache & Restart", fontWeight = FontWeight.Bold)
+            Text("Reset App Cache & Restart", fontWeight = FontWeight.Bold, color = Color.White)
         }
 
         Spacer(modifier = Modifier.height(10.dp))

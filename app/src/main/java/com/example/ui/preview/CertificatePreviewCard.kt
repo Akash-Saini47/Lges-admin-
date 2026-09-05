@@ -185,12 +185,20 @@ fun CertificatePreviewCard(
                     val fullBitmap = CertificateDrawer.drawCertificate(context, certificate, qr)
                     Exporter.savePdfToDevice(context, fullBitmap, "${certificate.rollNo}_${certificate.studentName}")
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = LgesNavy),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = LgesNavy,
+                    contentColor = Color.White
+                ),
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(
+                    Icons.Default.PictureAsPdf,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = Color.White
+                )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Export PDF", fontSize = 12.sp)
+                Text("Export PDF", fontSize = 12.sp, color = Color.White)
             }
 
             OutlinedButton(

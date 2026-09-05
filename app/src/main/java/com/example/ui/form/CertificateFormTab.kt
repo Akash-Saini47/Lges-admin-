@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,8 +30,11 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,15 +87,28 @@ fun CertificateFormTab(
     val uploadError by viewModel.uploadError.collectAsStateWithLifecycle()
 
     // Dropdown states
+    val focusManager = LocalFocusManager.current
     var gradeDropdownExpanded by remember { mutableStateOf(false) }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
     var relationDropdownExpanded by remember { mutableStateOf(false) }
 
     val currentCertificate = viewModel.getAsCertificate()
 
+    val formTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.Black,
+        unfocusedTextColor = Color.Black,
+        cursorColor = LgesNavy,
+        focusedLabelColor = LgesNavy,
+        unfocusedLabelColor = Color(0xFF555555),
+        focusedBorderColor = LgesNavy,
+        unfocusedBorderColor = Color(0xFFBDBDBD)
+    )
+    val formTextStyle = LocalTextStyle.current.copy(color = Color.Black)
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .imePadding()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -141,6 +159,8 @@ fun CertificateFormTab(
                         viewModel.rollNo.value = it
                         viewModel.checkForDuplicateRollNo(it)
                     },
+                    textStyle = formTextStyle,
+                    colors = formTextFieldColors,
                     label = { Text("Roll No. / Regd No. *") },
                     isError = errors.rollNoError != null,
                     supportingText = {
@@ -157,6 +177,8 @@ fun CertificateFormTab(
                 OutlinedTextField(
                     value = studentName,
                     onValueChange = { viewModel.studentName.value = it },
+                    textStyle = formTextStyle,
+                    colors = formTextFieldColors,
                     label = { Text("Student Name *") },
                     isError = errors.studentNameError != null,
                     supportingText = errors.studentNameError?.let { { Text(it, color = Color.Red) } },
@@ -170,16 +192,21 @@ fun CertificateFormTab(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     ExposedDropdownMenuBox(
                         expanded = relationDropdownExpanded,
-                        onExpandedChange = { relationDropdownExpanded = !relationDropdownExpanded },
+                        onExpandedChange = {
+                            focusManager.clearFocus()
+                            relationDropdownExpanded = !relationDropdownExpanded
+                        },
                         modifier = Modifier.width(100.dp)
                     ) {
                         OutlinedTextField(
                             value = relationPrefix,
                             onValueChange = {},
                             readOnly = true,
+                            textStyle = formTextStyle,
+                            colors = formTextFieldColors,
                             label = { Text("Rel") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = relationDropdownExpanded) },
-                            modifier = Modifier.menuAnchor()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         )
                         ExposedDropdownMenu(
                             expanded = relationDropdownExpanded,
@@ -187,7 +214,7 @@ fun CertificateFormTab(
                         ) {
                             listOf("S/O", "D/O", "W/O", "C/O").forEach { prefix ->
                                 DropdownMenuItem(
-                                    text = { Text(prefix) },
+                                    text = { Text(prefix, color = Color.Black) },
                                     onClick = {
                                         viewModel.relationPrefix.value = prefix
                                         relationDropdownExpanded = false
@@ -202,6 +229,8 @@ fun CertificateFormTab(
                     OutlinedTextField(
                         value = fatherName,
                         onValueChange = { viewModel.fatherName.value = it },
+                        textStyle = formTextStyle,
+                        colors = formTextFieldColors,
                         label = { Text("Father / Guardian Name *") },
                         isError = errors.fatherNameError != null,
                         supportingText = errors.fatherNameError?.let { { Text(it, color = Color.Red) } },
@@ -222,6 +251,8 @@ fun CertificateFormTab(
                 OutlinedTextField(
                     value = courseName,
                     onValueChange = { viewModel.courseName.value = it },
+                    textStyle = formTextStyle,
+                    colors = formTextFieldColors,
                     label = { Text("Course / Internship Title *") },
                     isError = errors.courseNameError != null,
                     supportingText = errors.courseNameError?.let { { Text(it, color = Color.Red) } },
@@ -235,16 +266,21 @@ fun CertificateFormTab(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     ExposedDropdownMenuBox(
                         expanded = typeDropdownExpanded,
-                        onExpandedChange = { typeDropdownExpanded = !typeDropdownExpanded },
+                        onExpandedChange = {
+                            focusManager.clearFocus()
+                            typeDropdownExpanded = !typeDropdownExpanded
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
                         OutlinedTextField(
                             value = certType,
                             onValueChange = {},
                             readOnly = true,
+                            textStyle = formTextStyle,
+                            colors = formTextFieldColors,
                             label = { Text("Type") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeDropdownExpanded) },
-                            modifier = Modifier.menuAnchor()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         )
                         ExposedDropdownMenu(
                             expanded = typeDropdownExpanded,
@@ -252,7 +288,7 @@ fun CertificateFormTab(
                         ) {
                             CertificateValidator.SUPPORTED_CERT_TYPES.forEach { type ->
                                 DropdownMenuItem(
-                                    text = { Text(type) },
+                                    text = { Text(type, color = Color.Black) },
                                     onClick = {
                                         viewModel.certType.value = type
                                         typeDropdownExpanded = false
@@ -266,16 +302,21 @@ fun CertificateFormTab(
 
                     ExposedDropdownMenuBox(
                         expanded = gradeDropdownExpanded,
-                        onExpandedChange = { gradeDropdownExpanded = !gradeDropdownExpanded },
+                        onExpandedChange = {
+                            focusManager.clearFocus()
+                            gradeDropdownExpanded = !gradeDropdownExpanded
+                        },
                         modifier = Modifier.width(110.dp)
                     ) {
                         OutlinedTextField(
                             value = grade,
                             onValueChange = {},
                             readOnly = true,
+                            textStyle = formTextStyle,
+                            colors = formTextFieldColors,
                             label = { Text("Grade") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = gradeDropdownExpanded) },
-                            modifier = Modifier.menuAnchor()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         )
                         ExposedDropdownMenu(
                             expanded = gradeDropdownExpanded,
@@ -283,7 +324,7 @@ fun CertificateFormTab(
                         ) {
                             CertificateValidator.SUPPORTED_GRADES.forEach { g ->
                                 DropdownMenuItem(
-                                    text = { Text(g) },
+                                    text = { Text(g, color = Color.Black) },
                                     onClick = {
                                         viewModel.grade.value = g
                                         gradeDropdownExpanded = false
@@ -301,14 +342,20 @@ fun CertificateFormTab(
                     OutlinedTextField(
                         value = sessionRange,
                         onValueChange = { viewModel.sessionRange.value = it },
+                        textStyle = formTextStyle,
+                        colors = formTextFieldColors,
                         label = { Text("Session (e.g. 2024-2025)") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
+
                     Spacer(modifier = Modifier.width(8.dp))
+
                     OutlinedTextField(
                         value = duration,
                         onValueChange = { viewModel.duration.value = it },
+                        textStyle = formTextStyle,
+                        colors = formTextFieldColors,
                         label = { Text("Duration (e.g. 1 Year)") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
@@ -322,6 +369,8 @@ fun CertificateFormTab(
                     OutlinedTextField(
                         value = placeOfIssue,
                         onValueChange = { viewModel.placeOfIssue.value = it },
+                        textStyle = formTextStyle,
+                        colors = formTextFieldColors,
                         label = { Text("Place of Issue") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
@@ -332,9 +381,12 @@ fun CertificateFormTab(
                     OutlinedTextField(
                         value = dateOfIssue,
                         onValueChange = { viewModel.dateOfIssue.value = it },
+                        textStyle = formTextStyle,
+                        colors = formTextFieldColors,
                         label = { Text("Date of Issue *") },
                         trailingIcon = {
                             IconButton(onClick = {
+                                focusManager.clearFocus()
                                 val cal = Calendar.getInstance()
                                 DatePickerDialog(
                                     context,
@@ -348,7 +400,7 @@ fun CertificateFormTab(
                                     cal.get(Calendar.DAY_OF_MONTH)
                                 ).show()
                             }) {
-                                Icon(Icons.Default.CalendarToday, contentDescription = "Pick Date")
+                                Icon(Icons.Default.CalendarToday, contentDescription = "Pick Date", tint = LgesNavy)
                             }
                         },
                         singleLine = true,
@@ -376,12 +428,24 @@ fun CertificateFormTab(
                             }
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = LgesNavy),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LgesNavy,
+                        contentColor = Color.White
+                    ),
                     modifier = Modifier.weight(1.2f)
                 ) {
-                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Default.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.White
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (editingId != null) "Update Certificate" else "Save & Sync", fontWeight = FontWeight.Bold)
+                    Text(
+                        if (editingId != null) "Update Certificate" else "Save & Sync",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
 
                 OutlinedButton(

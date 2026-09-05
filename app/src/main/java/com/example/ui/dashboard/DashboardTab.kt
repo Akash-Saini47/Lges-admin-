@@ -149,12 +149,20 @@ fun DashboardTab(
                 ) {
                     Button(
                         onClick = onNavigateToCreate,
-                        colors = ButtonDefaults.buttonColors(containerColor = LgesNavy),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LgesNavy,
+                            contentColor = Color.White
+                        ),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Default.AddCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Create", fontSize = 13.sp)
+                        Text("Create", fontSize = 13.sp, color = Color.White)
                     }
 
                     OutlinedButton(
@@ -221,9 +229,12 @@ fun DashboardTab(
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
                             onClick = onNavigateToCreate,
-                            colors = ButtonDefaults.buttonColors(containerColor = LgesNavy)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = LgesNavy,
+                                contentColor = Color.White
+                            )
                         ) {
-                            Text("Create First Certificate")
+                            Text("Create First Certificate", color = Color.White)
                         }
                     }
                 }

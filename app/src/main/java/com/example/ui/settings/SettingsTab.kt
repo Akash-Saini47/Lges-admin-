@@ -176,17 +176,27 @@ fun SettingsTab(
                         }
                     },
                     enabled = !isTestingConnection,
-                    colors = ButtonDefaults.buttonColors(containerColor = LgesNavy),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LgesNavy,
+                        contentColor = Color.White,
+                        disabledContainerColor = LgesNavy.copy(alpha = 0.6f),
+                        disabledContentColor = Color.White.copy(alpha = 0.8f)
+                    ),
                     modifier = Modifier.weight(1.2f)
                 ) {
                     if (isTestingConnection) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Testing...", fontSize = 13.sp)
+                        Text("Testing...", fontSize = 13.sp, color = Color.White)
                     } else {
-                        Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Default.NetworkCheck,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Test Connection", fontSize = 13.sp)
+                        Text("Test Connection", fontSize = 13.sp, color = Color.White)
                     }
                 }
 

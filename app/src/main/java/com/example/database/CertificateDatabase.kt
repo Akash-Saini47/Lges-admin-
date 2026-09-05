@@ -114,26 +114,91 @@ abstract class CertificateDatabase : RoomDatabase() {
          * Hardens the cloud synchronization engine:
          * - Introduces syncStatus ('PENDING', 'SYNCING', 'SYNCED', 'FAILED', 'DELETE_PENDING', 'DELETE_FAILED')
          * - Adds lastSyncTime, retryCount, and lastSyncError
-         * - Non-destructively maps existing `isSynced = 1` -> 'SYNCED', `0` -> 'PENDING'
-         * - Adds index on syncStatus
+         * - Non-destructively replaces legacy isSynced column with syncStatus to match Room schema version 4
+         * - Recreates the certificates table with exact Room schema and indices
          */
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 AppLogger.i("CertificateDatabase", "Running Room MIGRATION_3_4")
 
-                db.execSQL("ALTER TABLE certificates ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'PENDING'")
-                db.execSQL("ALTER TABLE certificates ADD COLUMN lastSyncTime INTEGER")
-                db.execSQL("ALTER TABLE certificates ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE certificates ADD COLUMN lastSyncError TEXT")
-
-                // Non-destructive data migration from legacy isSynced column
+                // Step 1: Create table matching Room entity schema version 4
                 db.execSQL(
                     """
-                    UPDATE certificates 
-                    SET syncStatus = CASE WHEN isSynced = 1 THEN 'SYNCED' ELSE 'PENDING' END
+                    CREATE TABLE IF NOT EXISTS certificates_new (
+                        certificateId TEXT NOT NULL PRIMARY KEY,
+                        rollNo TEXT NOT NULL,
+                        studentName TEXT NOT NULL,
+                        fatherName TEXT NOT NULL,
+                        courseName TEXT NOT NULL,
+                        sessionRange TEXT NOT NULL,
+                        duration TEXT NOT NULL,
+                        grade TEXT NOT NULL,
+                        placeOfIssue TEXT NOT NULL,
+                        dateOfIssue TEXT NOT NULL,
+                        certType TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        syncStatus TEXT NOT NULL,
+                        lastSyncTime INTEGER,
+                        retryCount INTEGER NOT NULL,
+                        lastSyncError TEXT
+                    )
                     """.trimIndent()
                 )
 
+                // Inspect existing columns to handle any prior partial alterations gracefully
+                val cursor = db.query("PRAGMA table_info(certificates)")
+                val existingColumns = mutableSetOf<String>()
+                cursor.use {
+                    val nameIdx = it.getColumnIndex("name")
+                    while (it.moveToNext()) {
+                        if (nameIdx != -1) {
+                            existingColumns.add(it.getString(nameIdx))
+                        }
+                    }
+                }
+
+                val syncStatusSql = when {
+                    existingColumns.contains("syncStatus") && existingColumns.contains("isSynced") ->
+                        "CASE WHEN syncStatus IS NOT NULL AND syncStatus != '' THEN syncStatus WHEN isSynced = 1 THEN 'SYNCED' ELSE 'PENDING' END"
+                    existingColumns.contains("syncStatus") ->
+                        "COALESCE(syncStatus, 'PENDING')"
+                    existingColumns.contains("isSynced") ->
+                        "CASE WHEN isSynced = 1 THEN 'SYNCED' ELSE 'PENDING' END"
+                    else ->
+                        "'PENDING'"
+                }
+
+                val lastSyncTimeSql = if (existingColumns.contains("lastSyncTime")) "lastSyncTime" else "NULL"
+                val retryCountSql = if (existingColumns.contains("retryCount")) "COALESCE(retryCount, 0)" else "0"
+                val lastSyncErrorSql = if (existingColumns.contains("lastSyncError")) "lastSyncError" else "NULL"
+
+                // Step 2: Copy data from certificates into certificates_new
+                db.execSQL(
+                    """
+                    INSERT INTO certificates_new (
+                        certificateId, rollNo, studentName, fatherName, courseName,
+                        sessionRange, duration, grade, placeOfIssue, dateOfIssue,
+                        certType, timestamp, syncStatus, lastSyncTime, retryCount, lastSyncError
+                    )
+                    SELECT
+                        certificateId, rollNo, studentName, fatherName, courseName,
+                        sessionRange, duration, grade, placeOfIssue, dateOfIssue,
+                        certType, timestamp,
+                        $syncStatusSql,
+                        $lastSyncTimeSql,
+                        $retryCountSql,
+                        $lastSyncErrorSql
+                    FROM certificates
+                    """.trimIndent()
+                )
+
+                // Step 3: Drop old table and rename new table
+                db.execSQL("DROP TABLE certificates")
+                db.execSQL("ALTER TABLE certificates_new RENAME TO certificates")
+
+                // Step 4: Recreate indices expected by Room version 4
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_certificates_rollNo ON certificates(rollNo)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_certificates_timestamp ON certificates(timestamp)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_certificates_syncStatus ON certificates(syncStatus)")
             }
         }
@@ -153,7 +218,7 @@ abstract class CertificateDatabase : RoomDatabase() {
                         MIGRATION_2_3,
                         MIGRATION_3_4
                     )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(true)
                     .build()
                     .also {
                         INSTANCE = it

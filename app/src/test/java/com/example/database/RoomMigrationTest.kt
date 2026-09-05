@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
+import androidx.room.Room
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -171,7 +174,95 @@ class RoomMigrationTest {
         assertEquals("PENDING", cursorPending.getString(cursorPending.getColumnIndexOrThrow("syncStatus")))
         cursorPending.close()
 
+        // Verify isSynced column is NOT present in migrated table
+        val pragmaCursor = v3Db.query("PRAGMA table_info(certificates)")
+        val columnNames = mutableListOf<String>()
+        while (pragmaCursor.moveToNext()) {
+            columnNames.add(pragmaCursor.getString(pragmaCursor.getColumnIndexOrThrow("name")))
+        }
+        pragmaCursor.close()
+        assertFalse("isSynced column must not exist in schema version 4", columnNames.contains("isSynced"))
+        assertTrue("syncStatus column must exist", columnNames.contains("syncStatus"))
+        assertTrue("retryCount column must exist", columnNames.contains("retryCount"))
+
         v3Db.close()
         dbFile.delete()
+    }
+
+    @Test
+    fun testMigration3To4WithFullRoomSchemaValidation() {
+        runBlocking {
+            val dbFile = File(context.cacheDir, "test_room_schema_val.db")
+            if (dbFile.exists()) dbFile.delete()
+
+            // 1. Create SQLite DB at version 3 with authentic v3 schema
+            val helperConfig = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(dbFile.name)
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL(
+                            """
+                            CREATE TABLE certificates (
+                                certificateId TEXT NOT NULL PRIMARY KEY,
+                                rollNo TEXT NOT NULL,
+                                studentName TEXT NOT NULL,
+                                fatherName TEXT NOT NULL,
+                                courseName TEXT NOT NULL,
+                                sessionRange TEXT NOT NULL,
+                                duration TEXT NOT NULL,
+                                grade TEXT NOT NULL,
+                                placeOfIssue TEXT NOT NULL,
+                                dateOfIssue TEXT NOT NULL,
+                                certType TEXT NOT NULL,
+                                timestamp INTEGER NOT NULL,
+                                isSynced INTEGER NOT NULL DEFAULT 0
+                            )
+                            """.trimIndent()
+                        )
+                        db.execSQL("CREATE INDEX index_certificates_rollNo ON certificates(rollNo)")
+                        db.execSQL("CREATE INDEX index_certificates_timestamp ON certificates(timestamp)")
+                    }
+                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+                })
+                .build()
+
+            val openHelper = FrameworkSQLiteOpenHelperFactory().create(helperConfig)
+            val v3Db = openHelper.writableDatabase
+            v3Db.execSQL(
+                """
+                INSERT INTO certificates (
+                    certificateId, rollNo, studentName, fatherName, courseName, sessionRange,
+                    duration, grade, placeOfIssue, dateOfIssue, certType, timestamp, isSynced
+                ) VALUES (
+                    'LGES-9001', '9001', 'Kavita Devi', 'Sh. Ram Lal', 'CCC', '2024-2025',
+                    '3 Months', 'A', 'CHAMBA', '15-06-2024', 'Course', 1718409600000, 1
+                )
+                """.trimIndent()
+            )
+            v3Db.close()
+
+            // 2. Open this exact database using Room with MIGRATION_3_4 registered!
+            // Room will execute MIGRATION_3_4 and trigger its internal onValidateSchema().
+            // If the table columns or indices do not match Room's compiled schema, Room will throw an exception.
+            val roomDb = Room.databaseBuilder(
+                context,
+                CertificateDatabase::class.java,
+                dbFile.name
+            )
+                .addMigrations(CertificateDatabase.MIGRATION_3_4)
+                .build()
+
+            val list = roomDb.certificateDao().getAllCertificatesRaw()
+            assertEquals(1, list.size)
+            val cert = list[0]
+            assertEquals("LGES-9001", cert.certificateId)
+            assertEquals("Kavita Devi", cert.studentName)
+            assertEquals(SyncStatus.SYNCED, cert.syncStatus)
+            assertTrue(cert.isSynced)
+            assertEquals(0, cert.retryCount)
+
+            roomDb.close()
+            dbFile.delete()
+        }
     }
 }

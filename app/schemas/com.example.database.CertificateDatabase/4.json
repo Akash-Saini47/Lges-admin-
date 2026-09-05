@@ -1,0 +1,148 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "d67e0cf43163718bd815d1e640b583dd",
+    "entities": [
+      {
+        "tableName": "certificates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`certificateId` TEXT NOT NULL, `rollNo` TEXT NOT NULL, `studentName` TEXT NOT NULL, `fatherName` TEXT NOT NULL, `courseName` TEXT NOT NULL, `sessionRange` TEXT NOT NULL, `duration` TEXT NOT NULL, `grade` TEXT NOT NULL, `placeOfIssue` TEXT NOT NULL, `dateOfIssue` TEXT NOT NULL, `certType` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `syncStatus` TEXT NOT NULL, `lastSyncTime` INTEGER, `retryCount` INTEGER NOT NULL, `lastSyncError` TEXT, PRIMARY KEY(`certificateId`))",
+        "fields": [
+          {
+            "fieldPath": "certificateId",
+            "columnName": "certificateId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rollNo",
+            "columnName": "rollNo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "studentName",
+            "columnName": "studentName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fatherName",
+            "columnName": "fatherName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "courseName",
+            "columnName": "courseName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionRange",
+            "columnName": "sessionRange",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "duration",
+            "columnName": "duration",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grade",
+            "columnName": "grade",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placeOfIssue",
+            "columnName": "placeOfIssue",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateOfIssue",
+            "columnName": "dateOfIssue",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "certType",
+            "columnName": "certType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSyncTime",
+            "columnName": "lastSyncTime",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "retryCount",
+            "columnName": "retryCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSyncError",
+            "columnName": "lastSyncError",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "certificateId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_certificates_rollNo",
+            "unique": false,
+            "columnNames": [
+              "rollNo"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_certificates_rollNo` ON `${TABLE_NAME}` (`rollNo`)"
+          },
+          {
+            "name": "index_certificates_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_certificates_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          },
+          {
+            "name": "index_certificates_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_certificates_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd67e0cf43163718bd815d1e640b583dd')"
+    ]
+  }
+}
