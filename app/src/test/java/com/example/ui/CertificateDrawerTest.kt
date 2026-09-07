@@ -359,4 +359,102 @@ class CertificateDrawerTest {
         val rollNoRightEdge = CertificateDrawer.Layout.ROLL_NO_X + CertificateDrawer.Layout.ROLL_NO_MAX_WIDTH
         assertTrue("Roll No right edge must not exceed canvas width", rollNoRightEdge <= 2400f)
     }
+
+    // 13. Label prefix stripping tests
+    @Test
+    fun testLabelStripping() {
+        // Roll No
+        assertEquals("LGES2026AI000123456789", CertificateDrawer.cleanRollNoForDisplay("Roll No.: LGES2026AI000123456789"))
+        assertEquals("LGES2026AI000123456789", CertificateDrawer.cleanRollNoForDisplay("Roll No: LGES2026AI000123456789"))
+        assertEquals("LGES2026AI000123456789", CertificateDrawer.cleanRollNoForDisplay("Roll-LGES2026AI000123456789"))
+        assertEquals("LGES2026AI000123456789", CertificateDrawer.cleanRollNoForDisplay("LGES2026AI000123456789"))
+
+        // Session
+        assertEquals("2024 - 2026", CertificateDrawer.cleanSessionForDisplay("Session: 2024 - 2026"))
+        assertEquals("2024 - 2026", CertificateDrawer.cleanSessionForDisplay("Academic Session: 2024 - 2026"))
+        assertEquals("2024 - 2026", CertificateDrawer.cleanSessionForDisplay("2024 - 2026"))
+
+        // Performance Grade
+        assertEquals("A+", CertificateDrawer.cleanGradeForDisplay("Performance Grade: A+"))
+        assertEquals("A+", CertificateDrawer.cleanGradeForDisplay("Grade: A+"))
+        assertEquals("A+", CertificateDrawer.cleanGradeForDisplay("Grade A+"))
+        assertEquals("A+", CertificateDrawer.cleanGradeForDisplay("A+"))
+
+        // Metadata box labels
+        assertEquals("Lakshya Global", CertificateDrawer.cleanRunByForDisplay("Run By: Lakshya Global"))
+        assertEquals("2 Years", CertificateDrawer.cleanDurationForDisplay("Course Duration: 2 Years"))
+        assertEquals("2 Years", CertificateDrawer.cleanDurationForDisplay("Duration: 2 Years"))
+        assertEquals("25-07-2026", CertificateDrawer.cleanDateOfIssueForDisplay("Date of Issue: 25-07-2026"))
+        assertEquals("25-07-2026", CertificateDrawer.cleanDateOfIssueForDisplay("Date: 25-07-2026"))
+        assertEquals("CHAMBA", CertificateDrawer.cleanPlaceOfIssueForDisplay("Place of Issue: CHAMBA"))
+        assertEquals("CHAMBA", CertificateDrawer.cleanPlaceOfIssueForDisplay("Place: CHAMBA"))
+        assertEquals("www.lges.in", CertificateDrawer.cleanWebsiteForDisplay("Website: https://www.lges.in/"))
+    }
+
+    // 14. Specific User Test Cases for Certificate Generation
+    @Test
+    fun testUserSpecificTestCases() {
+        val cert = CertificateData(
+            rollNo = "Roll No.: LGES2026AI000123456789",
+            certificateId = "Cert No: LGES/2026/001",
+            studentName = "Mohammed Abdul Rahman Khan Siddiqui",
+            guardian = "S/O Dr. Vikramaditya Chandrasekharan",
+            course = "Master of Science in Artificial Intelligence and Machine Learning",
+            session = "Session: 2024 - 2026",
+            grade = "Grade: A+",
+            runBy = "Run By: Lakshya Global Educational Society",
+            duration = "Course Duration: 2 Years",
+            dateOfIssue = "Date of Issue: 25-07-2026",
+            placeOfIssue = "CHAMBA",
+            website = "Website: https://www.lakshyaglobal.org"
+        )
+
+        // Verify label stripping for all fields
+        val cleanRoll = CertificateDrawer.cleanRollNoForDisplay(cert.rollNo)
+        assertEquals("LGES2026AI000123456789", cleanRoll)
+
+        val cleanCertNo = CertificateDrawer.cleanCertNoForDisplay(cert.certificateId)
+        assertEquals("LGES/2026/001", cleanCertNo)
+
+        val cleanSession = CertificateDrawer.cleanSessionForDisplay(cert.session)
+        assertEquals("2024 - 2026", cleanSession)
+
+        val cleanGrade = CertificateDrawer.cleanGradeForDisplay(cert.grade)
+        assertEquals("A+", cleanGrade)
+
+        val cleanRunBy = CertificateDrawer.cleanRunByForDisplay(cert.runBy)
+        assertEquals("Lakshya Global Educational Society", cleanRunBy)
+
+        val cleanDuration = CertificateDrawer.cleanDurationForDisplay(cert.duration)
+        assertEquals("2 Years", cleanDuration)
+
+        val cleanDate = CertificateDrawer.cleanDateOfIssueForDisplay(cert.dateOfIssue)
+        assertEquals("25-07-2026", cleanDate)
+
+        val cleanWebsite = CertificateDrawer.cleanWebsiteForDisplay(cert.website)
+        assertEquals("www.lakshyaglobal.org", cleanWebsite)
+
+        // Verify long student name fitting
+        val studentNameSize = CertificateDrawer.calculateFittedTextSize(
+            cert.studentName,
+            paint,
+            CertificateLayout.NAME_MAX_WIDTH,
+            CertificateLayout.NAME_PREFERRED_SIZE
+        )
+        paint.textSize = studentNameSize
+        assertTrue(paint.measureText(cert.studentName) <= CertificateLayout.NAME_MAX_WIDTH)
+
+        // Verify long course name bounds
+        val bitmap = Bitmap.createBitmap(2400, 1600, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        CertificateDrawer.drawCourseName(
+            canvas = canvas,
+            text = cert.course,
+            centerX = CertificateLayout.COURSE_CENTER_X,
+            paint = paint
+        )
+
+        // Verify complete rendering without exceptions
+        val outputBitmap = CertificateDrawer.renderDynamicOverlay(canvas, cert, null)
+    }
 }

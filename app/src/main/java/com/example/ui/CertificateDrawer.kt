@@ -28,80 +28,111 @@ object CertificateLayout {
     const val WIDTH = 2400f
     const val HEIGHT = 1600f
 
-    // Content center shifted right from physical canvas center due to left sidebar
-    const val CONTENT_CENTER_X = 1330f
+    // Content center: aligned with template's "This certificate is awarded to", gold line, and "In recognition of"
+    const val CONTENT_CENTER_X = 1353f
 
     // 1. Roll No (Top-Left of Content Area)
-    const val ROLL_X = 650f
+    // Template 'Roll No.:' label ends at X = 794f with baseline Y = 540f.
+    // Dynamic value starts after the label at X = 808f.
+    const val ROLL_LABEL_END_X = 794f
+    const val ROLL_X = 808f
+    const val ROLL_VALUE_X = 808f
     const val ROLL_Y = 540f
-    const val ROLL_MAX_WIDTH = 420f
+    const val ROLL_MAX_WIDTH = 340f
     const val ROLL_PREFERRED_SIZE = 26f
     const val ROLL_MIN_SIZE = 14f
 
     // 2. Student Name
-    const val NAME_CENTER_X = 1330f
+    // Centered at CONTENT_CENTER_X = 1353f, baseline Y = 665f.
+    const val NAME_CENTER_X = 1353f
     const val NAME_Y = 665f
-    const val NAME_MAX_WIDTH = 1050f
-    const val NAME_PREFERRED_SIZE = 78f
-    const val NAME_MIN_SIZE = 32f
+    const val NAME_MAX_WIDTH = 1150f
+    const val NAME_PREFERRED_SIZE = 60f
+    const val NAME_MIN_SIZE = 28f
 
     // 3. Father / Guardian Name
-    const val FATHER_CENTER_X = 1330f
+    // Centered at CONTENT_CENTER_X = 1353f, baseline Y = 715f.
+    const val FATHER_CENTER_X = 1353f
     const val FATHER_Y = 715f
-    const val FATHER_MAX_WIDTH = 900f
-    const val FATHER_PREFERRED_SIZE = 30f
-    const val FATHER_MIN_SIZE = 18f
+    const val FATHER_MAX_WIDTH = 950f
+    const val FATHER_PREFERRED_SIZE = 28f
+    const val FATHER_MIN_SIZE = 16f
 
-    // 4. Course Name
-    const val COURSE_CENTER_X = 1330f
-    const val COURSE_START_Y = 905f
-    const val COURSE_SECOND_LINE_Y = 950f
-    const val COURSE_MAX_WIDTH = 1100f
-    const val COURSE_PREFERRED_SIZE = 70f
-    const val COURSE_MIN_SINGLE_LINE_SIZE = 40f
-    const val COURSE_PREFERRED_2LINE_SIZE = 48f
-    const val COURSE_MIN_SIZE = 24f
+    // 4. Course Name (Strict vertical bounding between 825f and 950f)
+    const val COURSE_CENTER_X = 1353f
+    const val COURSE_TOP = 825f
+    const val COURSE_BOTTOM = 950f
+    const val COURSE_START_Y = 874f
+    const val COURSE_SECOND_LINE_Y = 924f
+    const val COURSE_MAX_WIDTH = 1300f
+    const val COURSE_PREFERRED_SIZE = 52f
+    const val COURSE_MIN_SINGLE_LINE_SIZE = 36f
+    const val COURSE_PREFERRED_2LINE_SIZE = 38f
+    const val COURSE_MIN_SIZE = 20f
 
     // 5. Session Range
-    const val SESSION_X = 1100f
-    const val SESSION_Y = 1110f
-    const val SESSION_MAX_WIDTH = 220f
-    const val SESSION_PREFERRED_SIZE = 28f
+    // Template 'Session:' label ends at X = 1096f with baseline Y = 1105f.
+    const val SESSION_LABEL_END_X = 1096f
+    const val SESSION_X = 1115f
+    const val SESSION_Y = 1105f
+    const val SESSION_MAX_WIDTH = 260f
+    const val SESSION_PREFERRED_SIZE = 26f
     const val SESSION_MIN_SIZE = 16f
 
     // 6. Performance Grade
-    const val GRADE_X = 1765f
-    const val GRADE_Y = 1110f
-    const val GRADE_MAX_WIDTH = 200f
-    const val GRADE_PREFERRED_SIZE = 28f
+    // Template 'Performance Grade:' label ends at X = 1754f with baseline Y = 1105f.
+    const val GRADE_LABEL_END_X = 1754f
+    const val GRADE_X = 1775f
+    const val GRADE_Y = 1105f
+    const val GRADE_MAX_WIDTH = 180f
+    const val GRADE_PREFERRED_SIZE = 26f
     const val GRADE_MIN_SIZE = 16f
 
     // 7. Lower Information Box
-    const val INFO_BOX_X = 885f
-    const val INFO_BOX_MAX_WIDTH = 630f
-    const val RUN_BY_Y = 1211f
-    const val DURATION_Y = 1275f
-    const val DATE_OF_ISSUE_Y = 1339f
-    const val PLACE_OF_ISSUE_Y = 1405f
+    // Template colons are all at X = 908f.
+    // Dynamic values start at X = 925f, left aligned.
+    const val INFO_BOX_X = 925f
+    const val INFO_BOX_MAX_WIDTH = 585f
+    const val RUN_BY_Y = 1275f
+    const val DURATION_Y = 1338f
+    const val DATE_OF_ISSUE_Y = 1395f
+    const val PLACE_OF_ISSUE_Y = 1435f
     const val WEBSITE_Y = 1470f
     const val INFO_BOX_PREFERRED_SIZE = 24f
-    const val INFO_BOX_MIN_SIZE = 15f
+    const val INFO_BOX_MIN_SIZE = 14f
     const val WEBSITE_PREFERRED_SIZE = 22f
     const val WEBSITE_MIN_SIZE = 14f
 
     // 8. Dynamic QR Code Box Bounds
-    const val QR_LEFT = 1535f
-    const val QR_TOP = 1255f
-    const val QR_SIZE = 185f
-    const val QR_BITMAP_PADDING = 8f
-    const val QR_BITMAP_LEFT = QR_LEFT + QR_BITMAP_PADDING
-    const val QR_BITMAP_TOP = QR_TOP + QR_BITMAP_PADDING
-    const val QR_BITMAP_SIZE = QR_SIZE - (QR_BITMAP_PADDING * 2f)
+    // QR Gold Frame: Left=1538, Top=1258, Right=1719, Bottom=1441 (Width=181, Height=183)
+    const val QR_FRAME_LEFT = 1538f
+    const val QR_FRAME_TOP = 1258f
+    const val QR_FRAME_RIGHT = 1719f
+    const val QR_FRAME_BOTTOM = 1441f
+
+    const val QR_CLEAR_LEFT = 1542f
+    const val QR_CLEAR_TOP = 1262f
+    const val QR_CLEAR_RIGHT = 1715f
+    const val QR_CLEAR_BOTTOM = 1437f
+
+    const val QR_LEFT = 1538f
+    const val QR_TOP = 1258f
+    const val QR_SIZE = 181f
+
+    const val QR_DEST_LEFT = 1553f
+    const val QR_DEST_TOP = 1273f
+    const val QR_DEST_SIZE = 150f
+
+    const val QR_BITMAP_LEFT = 1553f
+    const val QR_BITMAP_TOP = 1273f
+    const val QR_BITMAP_SIZE = 150f
 
     // 9. Bottom-Right Certificate No / Reg No
-    const val CERT_NO_X = 2100f
+    // Template 'Certificate No/Reg No.:' ends at X = 2096f with baseline Y = 1475f.
+    const val CERT_NO_LABEL_END_X = 2096f
+    const val CERT_NO_X = 2105f
     const val CERT_NO_Y = 1475f
-    const val CERT_NO_MAX_WIDTH = 230f
+    const val CERT_NO_MAX_WIDTH = 275f
     const val CERT_NO_PREFERRED_SIZE = 24f
     const val CERT_NO_MIN_SIZE = 12f
 }
@@ -206,14 +237,14 @@ object CertificateDrawer {
         const val ROLL_NO_PREFERRED_SIZE = CertificateLayout.CERT_NO_PREFERRED_SIZE
         const val ROLL_NO_MIN_SIZE = CertificateLayout.CERT_NO_MIN_SIZE
 
-        const val QR_BOX_LEFT = 1535
-        const val QR_BOX_TOP = 1255
-        const val QR_BOX_WIDTH = 185
-        const val QR_BOX_HEIGHT = 185
+        const val QR_BOX_LEFT = 1538
+        const val QR_BOX_TOP = 1258
+        const val QR_BOX_WIDTH = 181
+        const val QR_BOX_HEIGHT = 183
 
-        const val QR_DEST_LEFT = 1543
-        const val QR_DEST_TOP = 1263
-        const val QR_DEST_SIZE = 169
+        const val QR_DEST_LEFT = 1553
+        const val QR_DEST_TOP = 1273
+        const val QR_DEST_SIZE = 150
     }
 
     /**
@@ -309,6 +340,15 @@ object CertificateDrawer {
     }
 
     /**
+     * Renders dynamic data and QR directly onto a canvas without requiring the PDF template.
+     * Useful for overlays, preview compositing, and test verification.
+     */
+    fun renderDynamicOverlay(canvas: Canvas, cert: CertificateData, qr: Bitmap? = null) {
+        drawDynamicData(canvas = canvas, cert = cert)
+        drawDynamicQr(canvas = canvas, qr = qr)
+    }
+
+    /**
      * Thread-safe in-memory cached template loader.
      */
     fun getOrLoadTemplate(context: Context): Bitmap? {
@@ -391,13 +431,14 @@ object CertificateDrawer {
         }
 
         // 1. Roll Number (Top-Left of Content Area)
-        // Left aligned at ROLL_X = 650f, baselineY = 540f
-        if (cert.rollNo.isNotBlank()) {
+        // Left aligned after template 'Roll No.:' label at ROLL_VALUE_X = 808f, baseline = 540f
+        val cleanRoll = cleanRollNoForDisplay(cert.rollNo)
+        if (cleanRoll.isNotBlank()) {
             paint.color = INK
             drawLeftFittedText(
                 canvas = canvas,
-                text = cert.rollNo,
-                x = CertificateLayout.ROLL_X,
+                text = cleanRoll,
+                x = CertificateLayout.ROLL_VALUE_X,
                 baselineY = CertificateLayout.ROLL_Y,
                 maxWidth = CertificateLayout.ROLL_MAX_WIDTH,
                 preferredSize = CertificateLayout.ROLL_PREFERRED_SIZE,
@@ -407,7 +448,7 @@ object CertificateDrawer {
         }
 
         // 2. Student Name
-        // Centered around NAME_CENTER_X = 1330f, baselineY = 665f, in LgesNavy
+        // Centered around NAME_CENTER_X = 1353f, baselineY = 665f, in NAVY
         paint.color = NAVY
         drawStudentName(
             canvas = canvas,
@@ -421,7 +462,7 @@ object CertificateDrawer {
         )
 
         // 3. Father / Guardian Name
-        // Centered around FATHER_CENTER_X = 1330f, baselineY = 715f, in INK
+        // Centered around FATHER_CENTER_X = 1353f, baselineY = 715f, in INK
         paint.color = INK
         val guardianText = normalizeGuardian(cert.guardian)
         if (guardianText.isNotBlank()) {
@@ -438,19 +479,19 @@ object CertificateDrawer {
         }
 
         // 4. Course Name (Prominent NAVY, 2-line balanced wrapping if long)
-        // Centered around COURSE_CENTER_X = 1330f, START_Y = 905f, SECOND_LINE_Y = 950f
+        // Strict boundaries between COURSE_TOP = 825f and COURSE_BOTTOM = 950f (never crossing gold line at 961f)
         paint.color = NAVY
-        drawCenteredMultilineFittedText(
+        drawCourseName(
             canvas = canvas,
             text = cert.course,
             centerX = CertificateLayout.COURSE_CENTER_X,
-            baselineY = CertificateLayout.COURSE_START_Y,
-            secondLineY = CertificateLayout.COURSE_SECOND_LINE_Y,
+            topBound = CertificateLayout.COURSE_TOP,
+            bottomBound = CertificateLayout.COURSE_BOTTOM,
             maxWidth = CertificateLayout.COURSE_MAX_WIDTH,
             preferredSize = CertificateLayout.COURSE_PREFERRED_SIZE,
-            minimumSingleLineSize = CertificateLayout.COURSE_MIN_SINGLE_LINE_SIZE,
+            minSingleLineSize = CertificateLayout.COURSE_MIN_SINGLE_LINE_SIZE,
             preferred2LineSize = CertificateLayout.COURSE_PREFERRED_2LINE_SIZE,
-            minimumSize = CertificateLayout.COURSE_MIN_SIZE,
+            minSize = CertificateLayout.COURSE_MIN_SIZE,
             paint = paint
         )
 
@@ -458,11 +499,12 @@ object CertificateDrawer {
         paint.color = INK
 
         // 5. Session Range
-        // Left aligned after template 'Session:' label at SESSION_X = 1100f, baselineY = 1110f
-        if (cert.session.isNotBlank()) {
+        // Left aligned after template 'Session:' label at SESSION_X = 1115f, baseline = 1105f
+        val cleanSession = cleanSessionForDisplay(cert.session)
+        if (cleanSession.isNotBlank()) {
             drawLeftFittedText(
                 canvas = canvas,
-                text = cert.session,
+                text = cleanSession,
                 x = CertificateLayout.SESSION_X,
                 baselineY = CertificateLayout.SESSION_Y,
                 maxWidth = CertificateLayout.SESSION_MAX_WIDTH,
@@ -473,11 +515,12 @@ object CertificateDrawer {
         }
 
         // 6. Performance Grade
-        // Left aligned after template 'Performance Grade:' label at GRADE_X = 1765f, baselineY = 1110f
-        if (cert.grade.isNotBlank()) {
+        // Left aligned after template 'Performance Grade:' label at GRADE_X = 1775f, baseline = 1105f
+        val cleanGrade = cleanGradeForDisplay(cert.grade)
+        if (cleanGrade.isNotBlank()) {
             drawLeftFittedText(
                 canvas = canvas,
-                text = cert.grade,
+                text = cleanGrade,
                 x = CertificateLayout.GRADE_X,
                 baselineY = CertificateLayout.GRADE_Y,
                 maxWidth = CertificateLayout.GRADE_MAX_WIDTH,
@@ -488,11 +531,12 @@ object CertificateDrawer {
         }
 
         // 7. Run By (Institute)
-        // Left aligned at INFO_BOX_X = 885f, baselineY = 1211f
-        if (cert.runBy.isNotBlank()) {
+        // Left aligned after template 'Run By :' label at INFO_BOX_X = 925f, baseline = 1275f
+        val cleanRunBy = cleanRunByForDisplay(cert.runBy)
+        if (cleanRunBy.isNotBlank()) {
             drawLeftFittedText(
                 canvas = canvas,
-                text = cert.runBy,
+                text = cleanRunBy,
                 x = CertificateLayout.INFO_BOX_X,
                 baselineY = CertificateLayout.RUN_BY_Y,
                 maxWidth = CertificateLayout.INFO_BOX_MAX_WIDTH,
@@ -503,11 +547,12 @@ object CertificateDrawer {
         }
 
         // 8. Duration
-        // Left aligned at INFO_BOX_X = 885f, baselineY = 1275f
-        if (cert.duration.isNotBlank()) {
+        // Left aligned after template 'Course Duration :' label at INFO_BOX_X = 925f, baseline = 1338f
+        val cleanDuration = cleanDurationForDisplay(cert.duration)
+        if (cleanDuration.isNotBlank()) {
             drawLeftFittedText(
                 canvas = canvas,
-                text = cert.duration,
+                text = cleanDuration,
                 x = CertificateLayout.INFO_BOX_X,
                 baselineY = CertificateLayout.DURATION_Y,
                 maxWidth = CertificateLayout.INFO_BOX_MAX_WIDTH,
@@ -518,11 +563,12 @@ object CertificateDrawer {
         }
 
         // 9. Date of Issue
-        // Left aligned at INFO_BOX_X = 885f, baselineY = 1339f
-        if (cert.dateOfIssue.isNotBlank()) {
+        // Left aligned after template 'Date of Issue :' label at INFO_BOX_X = 925f, baseline = 1395f
+        val cleanDate = cleanDateOfIssueForDisplay(cert.dateOfIssue)
+        if (cleanDate.isNotBlank()) {
             drawLeftFittedText(
                 canvas = canvas,
-                text = cert.dateOfIssue,
+                text = cleanDate,
                 x = CertificateLayout.INFO_BOX_X,
                 baselineY = CertificateLayout.DATE_OF_ISSUE_Y,
                 maxWidth = CertificateLayout.INFO_BOX_MAX_WIDTH,
@@ -533,22 +579,25 @@ object CertificateDrawer {
         }
 
         // 10. Place of Issue
-        // Left aligned at INFO_BOX_X = 885f, baselineY = 1405f
-        if (cert.placeOfIssue.isNotBlank()) {
-            drawLeftFittedText(
-                canvas = canvas,
-                text = cert.placeOfIssue,
-                x = CertificateLayout.INFO_BOX_X,
-                baselineY = CertificateLayout.PLACE_OF_ISSUE_Y,
-                maxWidth = CertificateLayout.INFO_BOX_MAX_WIDTH,
-                preferredSize = CertificateLayout.INFO_BOX_PREFERRED_SIZE,
-                minimumSize = CertificateLayout.INFO_BOX_MIN_SIZE,
-                paint = paint
-            )
+        // Left aligned at INFO_BOX_X = 925f, baseline = 1435f
+        val cleanPlace = cleanPlaceOfIssueForDisplay(cert.placeOfIssue)
+        if (cleanPlace.isNotBlank() && !cleanPlace.equals("CHAMBA", ignoreCase = true) || cert.placeOfIssue.isNotBlank()) {
+            if (cleanPlace.isNotBlank()) {
+                drawLeftFittedText(
+                    canvas = canvas,
+                    text = cleanPlace,
+                    x = CertificateLayout.INFO_BOX_X,
+                    baselineY = CertificateLayout.PLACE_OF_ISSUE_Y,
+                    maxWidth = CertificateLayout.INFO_BOX_MAX_WIDTH,
+                    preferredSize = CertificateLayout.INFO_BOX_PREFERRED_SIZE,
+                    minimumSize = CertificateLayout.INFO_BOX_MIN_SIZE,
+                    paint = paint
+                )
+            }
         }
 
         // 11. Website
-        // Left aligned at INFO_BOX_X = 885f, baselineY = 1470f
+        // Left aligned after template 'Website :' label at INFO_BOX_X = 925f, baseline = 1470f
         val cleanWebsite = cleanWebsiteForDisplay(cert.website)
         if (cleanWebsite.isNotBlank()) {
             drawLeftFittedText(
@@ -564,12 +613,13 @@ object CertificateDrawer {
         }
 
         // 12. Roll No / Certificate / Registration Number (Bottom-Right)
-        // Left aligned after template 'ROLL NO/REG NO.:' label at CERT_NO_X = 2100f, baselineY = 1475f
-        val certNoToDraw = cert.certificateId.ifBlank { cert.rollNo }
-        if (certNoToDraw.isNotBlank()) {
+        // Left aligned after template 'Certificate No/Reg No.:' label at CERT_NO_X = 2105f, baseline = 1475f
+        val rawCertNo = cert.certificateId.ifBlank { cert.rollNo }
+        val cleanCertNo = cleanCertNoForDisplay(rawCertNo)
+        if (cleanCertNo.isNotBlank()) {
             drawLeftFittedText(
                 canvas = canvas,
-                text = certNoToDraw,
+                text = cleanCertNo,
                 x = CertificateLayout.CERT_NO_X,
                 baselineY = CertificateLayout.CERT_NO_Y,
                 maxWidth = CertificateLayout.CERT_NO_MAX_WIDTH,
@@ -585,6 +635,78 @@ object CertificateDrawer {
      */
     fun normalizeWhitespace(text: String): String {
         return text.trim().replace(Regex("\\s+"), " ")
+    }
+
+    /**
+     * Strips duplicate 'Roll No.:' or 'Roll No' prefix if entered by user.
+     */
+    fun cleanRollNoForDisplay(rollNo: String): String {
+        val clean = normalizeWhitespace(rollNo)
+        val prefixRegex = Regex("^(Roll\\s*No[.:\\s-]*|Roll[.:\\s-]+)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
+    }
+
+    /**
+     * Strips duplicate 'Session:' prefix if entered by user.
+     */
+    fun cleanSessionForDisplay(session: String): String {
+        val clean = normalizeWhitespace(session)
+        val prefixRegex = Regex("^(Session[.:\\s-]*|Academic\\s*Session[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
+    }
+
+    /**
+     * Strips duplicate 'Performance Grade:' or 'Grade:' prefix if entered by user.
+     */
+    fun cleanGradeForDisplay(grade: String): String {
+        val clean = normalizeWhitespace(grade)
+        val prefixRegex = Regex("^(Performance\\s*Grade[.:\\s-]*|Grade[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
+    }
+
+    /**
+     * Strips duplicate 'Certificate No/Reg No.:' or 'Cert No:' prefix if entered by user.
+     */
+    fun cleanCertNoForDisplay(certNo: String): String {
+        val clean = normalizeWhitespace(certNo)
+        val prefixRegex = Regex("^(Certificate\\s*No\\s*/\\s*Reg\\s*No[.:\\s-]*|Certificate\\s*No[.:\\s-]*|Cert\\s*No[.:\\s-]*|Reg\\s*No[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
+    }
+
+    /**
+     * Strips duplicate 'Run By:' prefix if entered by user.
+     */
+    fun cleanRunByForDisplay(runBy: String): String {
+        val clean = normalizeWhitespace(runBy)
+        val prefixRegex = Regex("^(Run\\s*By[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
+    }
+
+    /**
+     * Strips duplicate 'Course Duration:' or 'Duration:' prefix if entered by user.
+     */
+    fun cleanDurationForDisplay(duration: String): String {
+        val clean = normalizeWhitespace(duration)
+        val prefixRegex = Regex("^(Course\\s*Duration[.:\\s-]*|Duration[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
+    }
+
+    /**
+     * Strips duplicate 'Date of Issue:' or 'Date:' prefix if entered by user.
+     */
+    fun cleanDateOfIssueForDisplay(date: String): String {
+        val clean = normalizeWhitespace(date)
+        val prefixRegex = Regex("^(Date\\s*of\\s*Issue[.:\\s-]*|Date[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
+    }
+
+    /**
+     * Strips duplicate 'Place of Issue:' or 'Place:' prefix if entered by user.
+     */
+    fun cleanPlaceOfIssueForDisplay(place: String): String {
+        val clean = normalizeWhitespace(place)
+        val prefixRegex = Regex("^(Place\\s*of\\s*Issue[.:\\s-]*|Place[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        return clean.replace(prefixRegex, "").trim()
     }
 
     /**
@@ -611,10 +733,12 @@ object CertificateDrawer {
     }
 
     /**
-     * Strips protocol and trailing slashes for clean aesthetic certificate display.
+     * Strips duplicate 'Website:' label, protocol and trailing slashes for clean aesthetic certificate display.
      */
     fun cleanWebsiteForDisplay(website: String): String {
-        var clean = website.trim()
+        var clean = normalizeWhitespace(website)
+        val prefixRegex = Regex("^(Website[.:\\s-]*)", RegexOption.IGNORE_CASE)
+        clean = clean.replace(prefixRegex, "").trim()
         if (clean.startsWith("https://", ignoreCase = true)) {
             clean = clean.substring(8)
         } else if (clean.startsWith("http://", ignoreCase = true)) {
@@ -626,11 +750,25 @@ object CertificateDrawer {
     private fun drawDynamicQr(canvas: Canvas, qr: Bitmap?) {
         if (qr == null || qr.isRecycled || qr.width <= 0 || qr.height <= 0) return
 
+        // 1. Clear the inner area of the gold QR frame with clean white
+        val clearPaint = Paint().apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.FILL
+        }
+        canvas.drawRect(
+            CertificateLayout.QR_CLEAR_LEFT,
+            CertificateLayout.QR_CLEAR_TOP,
+            CertificateLayout.QR_CLEAR_RIGHT,
+            CertificateLayout.QR_CLEAR_BOTTOM,
+            clearPaint
+        )
+
+        // 2. Draw the QR bitmap centered with equal margins
         val destination = Rect(
-            CertificateLayout.QR_BITMAP_LEFT.toInt(),
-            CertificateLayout.QR_BITMAP_TOP.toInt(),
-            (CertificateLayout.QR_BITMAP_LEFT + CertificateLayout.QR_BITMAP_SIZE).toInt(),
-            (CertificateLayout.QR_BITMAP_TOP + CertificateLayout.QR_BITMAP_SIZE).toInt()
+            CertificateLayout.QR_DEST_LEFT.toInt(),
+            CertificateLayout.QR_DEST_TOP.toInt(),
+            (CertificateLayout.QR_DEST_LEFT + CertificateLayout.QR_DEST_SIZE).toInt(),
+            (CertificateLayout.QR_DEST_TOP + CertificateLayout.QR_DEST_SIZE).toInt()
         )
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         canvas.drawBitmap(qr, null, destination, paint)
@@ -774,6 +912,102 @@ object CertificateDrawer {
         paint.textAlign = Paint.Align.LEFT
         paint.textSize = size
         canvas.drawText(clean, x, baselineY, paint)
+    }
+
+    /**
+     * Renders course name strictly bounded between [topBound] and [bottomBound].
+     * Guaranteed never to cross gold decorative line at 961f or touch text above at 790f.
+     */
+    fun drawCourseName(
+        canvas: Canvas,
+        text: String,
+        centerX: Float,
+        topBound: Float = CertificateLayout.COURSE_TOP,
+        bottomBound: Float = CertificateLayout.COURSE_BOTTOM,
+        maxWidth: Float = CertificateLayout.COURSE_MAX_WIDTH,
+        preferredSize: Float = CertificateLayout.COURSE_PREFERRED_SIZE,
+        minSingleLineSize: Float = CertificateLayout.COURSE_MIN_SINGLE_LINE_SIZE,
+        preferred2LineSize: Float = CertificateLayout.COURSE_PREFERRED_2LINE_SIZE,
+        minSize: Float = CertificateLayout.COURSE_MIN_SIZE,
+        paint: Paint
+    ) {
+        val clean = normalizeWhitespace(text)
+        if (clean.isBlank()) return
+
+        val availableHeight = bottomBound - topBound
+        val opticalCenterY = (topBound + bottomBound) / 2f
+
+        // 1. Try single-line if it fits comfortably within maxWidth
+        val singleLineSize = calculateFittedTextSize(clean, paint, maxWidth, preferredSize, minSize)
+        if (singleLineSize >= minSingleLineSize) {
+            paint.textAlign = Paint.Align.CENTER
+            paint.textSize = singleLineSize
+            val fm = paint.fontMetrics
+            val baseline = opticalCenterY - (fm.ascent + fm.descent) / 2f
+            canvas.drawText(clean, centerX, baseline, paint)
+            return
+        }
+
+        // 2. Try controlled 2-line wrapping
+        val words = clean.split(" ").filter { it.isNotBlank() }
+        if (words.size >= 2) {
+            var bestSplit = 1
+            var bestPenalty = Float.MAX_VALUE
+            paint.textSize = preferred2LineSize
+
+            for (i in 1 until words.size) {
+                val l1 = words.subList(0, i).joinToString(" ")
+                val l2 = words.subList(i, words.size).joinToString(" ")
+                val w1 = paint.measureText(l1)
+                val w2 = paint.measureText(l2)
+
+                val overflow = max(0f, w1 - maxWidth) + max(0f, w2 - maxWidth)
+                val imbalance = abs(w1 - w2)
+                val penalty = (overflow * 5f) + imbalance
+
+                if (penalty < bestPenalty) {
+                    bestPenalty = penalty
+                    bestSplit = i
+                }
+            }
+
+            val line1 = words.subList(0, bestSplit).joinToString(" ")
+            val line2 = words.subList(bestSplit, words.size).joinToString(" ")
+
+            val s1 = calculateFittedTextSize(line1, paint, maxWidth, preferred2LineSize, minSize)
+            val s2 = calculateFittedTextSize(line2, paint, maxWidth, preferred2LineSize, minSize)
+            var twoLineSize = min(s1, s2)
+
+            // Ensure two lines fit within available vertical height
+            paint.textSize = twoLineSize
+            var fm = paint.fontMetrics
+            val totalHeight = (fm.descent - fm.ascent) * 2.1f
+            if (totalHeight > availableHeight) {
+                val scale = availableHeight / totalHeight
+                twoLineSize = max(minSize, twoLineSize * scale)
+                paint.textSize = twoLineSize
+                fm = paint.fontMetrics
+            }
+
+            val lineSpacing = (fm.descent - fm.ascent) * 1.1f
+            val line1CenterY = opticalCenterY - (lineSpacing / 2f)
+            val line2CenterY = opticalCenterY + (lineSpacing / 2f)
+
+            val line1Baseline = line1CenterY - (fm.ascent + fm.descent) / 2f
+            val line2Baseline = line2CenterY - (fm.ascent + fm.descent) / 2f
+
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText(line1, centerX, line1Baseline, paint)
+            canvas.drawText(line2, centerX, line2Baseline, paint)
+            return
+        }
+
+        // Fallback for single very long word
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = singleLineSize
+        val fm = paint.fontMetrics
+        val baseline = opticalCenterY - (fm.ascent + fm.descent) / 2f
+        canvas.drawText(clean, centerX, baseline, paint)
     }
 
     /**
