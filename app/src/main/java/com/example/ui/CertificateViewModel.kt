@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,7 +41,7 @@ class CertificateViewModel(
     val allCertificates: StateFlow<List<Certificate>>
 
     // ============================================================
-    // EDITING STATE
+    // EDITING & DRAFT STATE
     // ============================================================
 
     /**
@@ -49,6 +50,12 @@ class CertificateViewModel(
      */
     private val editingCertificateId = MutableStateFlow<String?>(null)
     val currentEditingId: StateFlow<String?> = editingCertificateId.asStateFlow()
+
+    /**
+     * Stable draft certificate ID preserved during new certificate form entry.
+     * Prevents QR code and ID flickering on every keystroke.
+     */
+    private val draftCertificateId = MutableStateFlow(CertificateConfig.generateCertificateId())
 
     // ============================================================
     // FORM STATE
@@ -67,6 +74,60 @@ class CertificateViewModel(
         SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
     )
     val certType = MutableStateFlow("Course")
+
+    /**
+     * Reactive, real-time Certificate StateFlow combining all form inputs.
+     * Automatically emits whenever any form field or editing ID changes.
+     */
+    val liveCertificate: StateFlow<Certificate> = combine(
+        listOf(
+            rollNo,
+            studentName,
+            relationPrefix,
+            fatherName,
+            courseName,
+            sessionRange,
+            duration,
+            grade,
+            placeOfIssue,
+            dateOfIssue,
+            certType,
+            editingCertificateId,
+            draftCertificateId
+        )
+    ) { _ ->
+        val currentId = editingCertificateId.value ?: draftCertificateId.value
+        val formattedFather = formatFatherName(fatherName.value)
+        Certificate.create(
+            rollNo = rollNo.value,
+            studentName = studentName.value,
+            fatherName = formattedFather,
+            courseName = courseName.value,
+            sessionRange = sessionRange.value,
+            duration = duration.value,
+            grade = grade.value,
+            placeOfIssue = placeOfIssue.value,
+            dateOfIssue = dateOfIssue.value,
+            certType = certType.value,
+            customId = currentId
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = Certificate.create(
+            rollNo = "",
+            studentName = "",
+            fatherName = "",
+            courseName = "",
+            sessionRange = "",
+            duration = "",
+            grade = "A",
+            placeOfIssue = "CHAMBA",
+            dateOfIssue = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date()),
+            certType = "Course",
+            customId = draftCertificateId.value
+        )
+    )
 
     // ============================================================
     // VALIDATION STATE
@@ -222,6 +283,7 @@ class CertificateViewModel(
 
     fun loadCertificateForEditing(cert: Certificate) {
         editingCertificateId.value = cert.certificateId
+        draftCertificateId.value = cert.certificateId
         rollNo.value = cert.rollNo
         studentName.value = cert.studentName
 
@@ -263,6 +325,7 @@ class CertificateViewModel(
 
     fun clearForm() {
         editingCertificateId.value = null
+        draftCertificateId.value = CertificateConfig.generateCertificateId()
         rollNo.value = ""
         studentName.value = ""
         relationPrefix.value = "S/O"
@@ -290,6 +353,7 @@ class CertificateViewModel(
     // ============================================================
 
     fun getAsCertificate(): Certificate {
+        val currentId = editingCertificateId.value ?: draftCertificateId.value
         val formattedFather = formatFatherName(fatherName.value)
 
         return Certificate.create(
@@ -303,7 +367,7 @@ class CertificateViewModel(
             placeOfIssue = placeOfIssue.value,
             dateOfIssue = dateOfIssue.value,
             certType = certType.value,
-            customId = editingCertificateId.value
+            customId = currentId
         )
     }
 

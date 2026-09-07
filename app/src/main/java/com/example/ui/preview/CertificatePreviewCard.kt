@@ -71,7 +71,7 @@ fun CertificatePreviewCard(
     var isRendering by remember { mutableStateOf(false) }
     var showFullscreen by remember { mutableStateOf(false) }
 
-    // Debounced asynchronous preview generation (300ms) to keep typing fluid
+    // Debounced asynchronous preview generation (250ms) to keep typing fluid and responsive
     LaunchedEffect(
         certificate.rollNo,
         certificate.studentName,
@@ -82,10 +82,11 @@ fun CertificatePreviewCard(
         certificate.grade,
         certificate.placeOfIssue,
         certificate.dateOfIssue,
-        certificate.certType
+        certificate.certType,
+        certificate.certificateId
     ) {
         isRendering = true
-        delay(300) // Debounce rapid keystrokes
+        delay(250) // Debounce rapid keystrokes
 
         withContext(Dispatchers.Default) {
             try {

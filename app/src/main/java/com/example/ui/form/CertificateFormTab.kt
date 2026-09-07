@@ -2,6 +2,7 @@ package com.example.ui.form
 
 import android.app.DatePickerDialog
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -92,18 +93,25 @@ fun CertificateFormTab(
     var typeDropdownExpanded by remember { mutableStateOf(false) }
     var relationDropdownExpanded by remember { mutableStateOf(false) }
 
-    val currentCertificate = viewModel.getAsCertificate()
+    val currentCertificate by viewModel.liveCertificate.collectAsStateWithLifecycle()
 
     val formTextFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = Color.Black,
-        unfocusedTextColor = Color.Black,
+        focusedTextColor = Color(0xFF1E293B),
+        unfocusedTextColor = Color(0xFF1E293B),
+        focusedContainerColor = Color.White,
+        unfocusedContainerColor = Color.White,
         cursorColor = LgesNavy,
         focusedLabelColor = LgesNavy,
-        unfocusedLabelColor = Color(0xFF555555),
+        unfocusedLabelColor = Color(0xFF64748B),
         focusedBorderColor = LgesNavy,
-        unfocusedBorderColor = Color(0xFFBDBDBD)
+        unfocusedBorderColor = Color(0xFFCBD5E1),
+        errorTextColor = Color(0xFF1E293B),
+        errorBorderColor = Color(0xFFDC2626),
+        errorLabelColor = Color(0xFFDC2626),
+        errorCursorColor = Color(0xFFDC2626),
+        errorContainerColor = Color.White
     )
-    val formTextStyle = LocalTextStyle.current.copy(color = Color.Black)
+    val formTextStyle = LocalTextStyle.current.copy(color = Color(0xFF1E293B))
 
     LazyColumn(
         modifier = modifier
@@ -210,11 +218,20 @@ fun CertificateFormTab(
                         )
                         ExposedDropdownMenu(
                             expanded = relationDropdownExpanded,
-                            onDismissRequest = { relationDropdownExpanded = false }
+                            onDismissRequest = { relationDropdownExpanded = false },
+                            modifier = Modifier.background(Color.White)
                         ) {
                             listOf("S/O", "D/O", "W/O", "C/O").forEach { prefix ->
+                                val isSelected = relationPrefix == prefix
                                 DropdownMenuItem(
-                                    text = { Text(prefix, color = Color.Black) },
+                                    text = {
+                                        Text(
+                                            text = prefix,
+                                            color = if (isSelected) LgesNavy else Color(0xFF1E293B),
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    modifier = Modifier.background(if (isSelected) Color(0xFFEEF2FF) else Color.White),
                                     onClick = {
                                         viewModel.relationPrefix.value = prefix
                                         relationDropdownExpanded = false
@@ -284,11 +301,20 @@ fun CertificateFormTab(
                         )
                         ExposedDropdownMenu(
                             expanded = typeDropdownExpanded,
-                            onDismissRequest = { typeDropdownExpanded = false }
+                            onDismissRequest = { typeDropdownExpanded = false },
+                            modifier = Modifier.background(Color.White)
                         ) {
                             CertificateValidator.SUPPORTED_CERT_TYPES.forEach { type ->
+                                val isSelected = certType == type
                                 DropdownMenuItem(
-                                    text = { Text(type, color = Color.Black) },
+                                    text = {
+                                        Text(
+                                            text = type,
+                                            color = if (isSelected) LgesNavy else Color(0xFF1E293B),
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    modifier = Modifier.background(if (isSelected) Color(0xFFEEF2FF) else Color.White),
                                     onClick = {
                                         viewModel.certType.value = type
                                         typeDropdownExpanded = false
@@ -320,11 +346,20 @@ fun CertificateFormTab(
                         )
                         ExposedDropdownMenu(
                             expanded = gradeDropdownExpanded,
-                            onDismissRequest = { gradeDropdownExpanded = false }
+                            onDismissRequest = { gradeDropdownExpanded = false },
+                            modifier = Modifier.background(Color.White)
                         ) {
                             CertificateValidator.SUPPORTED_GRADES.forEach { g ->
+                                val isSelected = grade == g
                                 DropdownMenuItem(
-                                    text = { Text(g, color = Color.Black) },
+                                    text = {
+                                        Text(
+                                            text = g,
+                                            color = if (isSelected) LgesNavy else Color(0xFF1E293B),
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    modifier = Modifier.background(if (isSelected) Color(0xFFEEF2FF) else Color.White),
                                     onClick = {
                                         viewModel.grade.value = g
                                         gradeDropdownExpanded = false
