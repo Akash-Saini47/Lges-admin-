@@ -21,120 +21,315 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Master coordinate system and layout constants for the 2400x1600 certificate canvas.
+ * Master coordinate system and layout constants for the 1536x1024 certificate canvas.
  * Derived from the visual reference certificate (Reference_certificate.png).
  */
+data class FieldConfig(
+    val anchorX: Float,
+    val anchorY: Float,
+    val maxWidth: Float,
+    val maxHeight: Float = 0f,
+    val alignment: Paint.Align = Paint.Align.LEFT,
+    val minFontSize: Float = 8f,
+    val maxFontSize: Float = 16f,
+    val typeface: Typeface? = null,
+    val color: Int = COLOR_LGES_INK_ARGB,
+    val lineSpacing: Float = 1.1f,
+    val letterSpacing: Float = 0f
+)
+
 object CertificateLayout {
-    const val WIDTH = 2400f
-    const val HEIGHT = 1600f
+    const val canvasWidth = 1536
+    const val canvasHeight = 1024
+
+    const val WIDTH = 1536f
+    const val HEIGHT = 1024f
+
+    const val CANVAS_WIDTH = 1536
+    const val CANVAS_HEIGHT = 1024
 
     // Content center: aligned with template's "This certificate is awarded to", gold line, and "In recognition of"
-    const val CONTENT_CENTER_X = 1353f
+    const val CONTENT_CENTER_X = 866f
 
     // 1. Roll No (Top-Left of Content Area)
-    // Template 'Roll No.:' label ends at X = 794f with baseline Y = 540f.
-    // Dynamic value starts after the label at X = 808f.
-    const val ROLL_LABEL_END_X = 794f
-    const val ROLL_X = 808f
-    const val ROLL_VALUE_X = 808f
-    const val ROLL_Y = 540f
-    const val ROLL_MAX_WIDTH = 340f
-    const val ROLL_PREFERRED_SIZE = 26f
-    const val ROLL_MIN_SIZE = 14f
+    // Template 'Roll No.:' label ends at X = 508f with baseline Y = 345f.
+    // Dynamic value starts after the label at X = 517f.
+    const val ROLL_LABEL_END_X = 508f
+    const val ROLL_X = 517f
+    const val ROLL_VALUE_X = 517f
+    const val ROLL_Y = 345f
+    const val ROLL_MAX_WIDTH = 220f
+    const val ROLL_PREFERRED_SIZE = 17f
+    const val ROLL_MIN_SIZE = 9f
 
     // 2. Student Name
-    // Centered at CONTENT_CENTER_X = 1353f, baseline Y = 665f.
-    const val NAME_CENTER_X = 1353f
-    const val NAME_Y = 665f
-    const val NAME_MAX_WIDTH = 1150f
-    const val NAME_PREFERRED_SIZE = 60f
-    const val NAME_MIN_SIZE = 28f
+    // Centered at CONTENT_CENTER_X = 866f, baseline Y = 425f.
+    const val NAME_CENTER_X = 866f
+    const val NAME_Y = 425f
+    const val NAME_MAX_WIDTH = 736f
+    const val NAME_PREFERRED_SIZE = 38f
+    const val NAME_MIN_SIZE = 18f
 
     // 3. Father / Guardian Name
-    // Centered at CONTENT_CENTER_X = 1353f, baseline Y = 715f.
-    const val FATHER_CENTER_X = 1353f
-    const val FATHER_Y = 715f
-    const val FATHER_MAX_WIDTH = 950f
-    const val FATHER_PREFERRED_SIZE = 28f
-    const val FATHER_MIN_SIZE = 16f
+    // Centered at CONTENT_CENTER_X = 866f, baseline Y = 458f.
+    const val FATHER_CENTER_X = 866f
+    const val FATHER_Y = 458f
+    const val FATHER_MAX_WIDTH = 608f
+    const val FATHER_PREFERRED_SIZE = 18f
+    const val FATHER_MIN_SIZE = 11f
 
-    // 4. Course Name (Strict vertical bounding between 825f and 950f)
-    const val COURSE_CENTER_X = 1353f
-    const val COURSE_TOP = 825f
-    const val COURSE_BOTTOM = 950f
-    const val COURSE_START_Y = 874f
-    const val COURSE_SECOND_LINE_Y = 924f
-    const val COURSE_MAX_WIDTH = 1300f
-    const val COURSE_PREFERRED_SIZE = 52f
-    const val COURSE_MIN_SINGLE_LINE_SIZE = 36f
-    const val COURSE_PREFERRED_2LINE_SIZE = 38f
-    const val COURSE_MIN_SIZE = 20f
+    // 4. Course Name (Strict vertical bounding between 528f and 608f)
+    const val COURSE_CENTER_X = 866f
+    const val COURSE_TOP = 528f
+    const val COURSE_BOTTOM = 608f
+    const val COURSE_START_Y = 560f
+    const val COURSE_SECOND_LINE_Y = 588f
+    const val COURSE_MAX_WIDTH = 832f
+    const val COURSE_PREFERRED_SIZE = 33f
+    const val COURSE_MIN_SINGLE_LINE_SIZE = 23f
+    const val COURSE_PREFERRED_2LINE_SIZE = 24f
+    const val COURSE_MIN_SIZE = 13f
 
     // 5. Session Range
-    // Template 'Session:' label ends at X = 1096f with baseline Y = 1105f.
-    const val SESSION_LABEL_END_X = 1096f
-    const val SESSION_X = 1115f
-    const val SESSION_Y = 1105f
-    const val SESSION_MAX_WIDTH = 260f
-    const val SESSION_PREFERRED_SIZE = 26f
-    const val SESSION_MIN_SIZE = 16f
+    // Template 'Session:' label ends at X = 701f with baseline Y = 707f.
+    const val SESSION_LABEL_END_X = 701f
+    const val SESSION_X = 714f
+    const val SESSION_Y = 707f
+    const val SESSION_MAX_WIDTH = 166f
+    const val SESSION_PREFERRED_SIZE = 17f
+    const val SESSION_MIN_SIZE = 10f
 
     // 6. Performance Grade
-    // Template 'Performance Grade:' label ends at X = 1754f with baseline Y = 1105f.
-    const val GRADE_LABEL_END_X = 1754f
-    const val GRADE_X = 1775f
-    const val GRADE_Y = 1105f
-    const val GRADE_MAX_WIDTH = 180f
-    const val GRADE_PREFERRED_SIZE = 26f
-    const val GRADE_MIN_SIZE = 16f
+    // Template 'Performance Grade:' label ends at X = 1122f with baseline Y = 707f.
+    const val GRADE_LABEL_END_X = 1122f
+    const val GRADE_X = 1136f
+    const val GRADE_Y = 707f
+    const val GRADE_MAX_WIDTH = 115f
+    const val GRADE_PREFERRED_SIZE = 17f
+    const val GRADE_MIN_SIZE = 10f
 
     // 7. Lower Information Box
-    // Template colons are all at X = 908f.
-    // Dynamic values start at X = 925f, left aligned.
-    const val INFO_BOX_X = 925f
-    const val INFO_BOX_MAX_WIDTH = 585f
-    const val RUN_BY_Y = 1275f
-    const val DURATION_Y = 1338f
-    const val DATE_OF_ISSUE_Y = 1395f
-    const val PLACE_OF_ISSUE_Y = 1435f
-    const val WEBSITE_Y = 1470f
-    const val INFO_BOX_PREFERRED_SIZE = 24f
-    const val INFO_BOX_MIN_SIZE = 14f
-    const val WEBSITE_PREFERRED_SIZE = 22f
-    const val WEBSITE_MIN_SIZE = 14f
+    // Template colons are all at X = 582f.
+    // Dynamic values start at X = 592f, left aligned.
+    const val INFO_BOX_X = 592f
+    const val INFO_BOX_MAX_WIDTH = 374f
+    const val RUN_BY_Y = 816f
+    const val DURATION_Y = 856f
+    const val DATE_OF_ISSUE_Y = 893f
+    const val PLACE_OF_ISSUE_Y = 918f
+    const val WEBSITE_Y = 941f
+    const val INFO_BOX_PREFERRED_SIZE = 15.5f
+    const val INFO_BOX_MIN_SIZE = 9f
+    const val WEBSITE_PREFERRED_SIZE = 14f
+    const val WEBSITE_MIN_SIZE = 9f
 
     // 8. Dynamic QR Code Box Bounds
-    // QR Gold Frame: Left=1538, Top=1258, Right=1719, Bottom=1441 (Width=181, Height=183)
-    const val QR_FRAME_LEFT = 1538f
-    const val QR_FRAME_TOP = 1258f
-    const val QR_FRAME_RIGHT = 1719f
-    const val QR_FRAME_BOTTOM = 1441f
+    // QR Gold Frame: Left=985, Top=805, Right=1100, Bottom=922 (Width=115, Height=117)
+    const val QR_FRAME_LEFT = 985f
+    const val QR_FRAME_TOP = 805f
+    const val QR_FRAME_RIGHT = 1100f
+    const val QR_FRAME_BOTTOM = 922f
 
-    const val QR_CLEAR_LEFT = 1542f
-    const val QR_CLEAR_TOP = 1262f
-    const val QR_CLEAR_RIGHT = 1715f
-    const val QR_CLEAR_BOTTOM = 1437f
+    const val QR_CLEAR_LEFT = 988f
+    const val QR_CLEAR_TOP = 808f
+    const val QR_CLEAR_RIGHT = 1097f
+    const val QR_CLEAR_BOTTOM = 919f
 
-    const val QR_LEFT = 1538f
-    const val QR_TOP = 1258f
-    const val QR_SIZE = 181f
+    const val QR_LEFT = 985f
+    const val QR_TOP = 805f
+    const val QR_SIZE = 115f
 
-    const val QR_DEST_LEFT = 1553f
-    const val QR_DEST_TOP = 1273f
-    const val QR_DEST_SIZE = 150f
+    const val QR_DEST_LEFT = 994f
+    const val QR_DEST_TOP = 815f
+    const val QR_DEST_SIZE = 96f
 
-    const val QR_BITMAP_LEFT = 1553f
-    const val QR_BITMAP_TOP = 1273f
-    const val QR_BITMAP_SIZE = 150f
+    const val QR_BITMAP_LEFT = 994f
+    const val QR_BITMAP_TOP = 815f
+    const val QR_BITMAP_SIZE = 96f
 
     // 9. Bottom-Right Certificate No / Reg No
-    // Template 'Certificate No/Reg No.:' ends at X = 2096f with baseline Y = 1475f.
-    const val CERT_NO_LABEL_END_X = 2096f
-    const val CERT_NO_X = 2105f
-    const val CERT_NO_Y = 1475f
-    const val CERT_NO_MAX_WIDTH = 275f
-    const val CERT_NO_PREFERRED_SIZE = 24f
-    const val CERT_NO_MIN_SIZE = 12f
+    // Template 'Certificate No/Reg No.:' ends at X = 1328f with baseline Y = 944f.
+    const val CERT_NO_LABEL_END_X = 1328f
+    const val CERT_NO_X = 1347f
+    const val CERT_NO_Y = 944f
+    const val CERT_NO_MAX_WIDTH = 155f
+    const val CERT_NO_PREFERRED_SIZE = 15.5f
+    const val CERT_NO_MIN_SIZE = 8f
+
+    // Structured Field Configurations
+    val rollNo = FieldConfig(
+        anchorX = ROLL_VALUE_X,
+        anchorY = ROLL_Y,
+        maxWidth = ROLL_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = ROLL_MIN_SIZE,
+        maxFontSize = ROLL_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val awardedTo = FieldConfig(
+        anchorX = CONTENT_CENTER_X,
+        anchorY = 253f,
+        maxWidth = 600f,
+        maxHeight = 30f,
+        alignment = Paint.Align.CENTER,
+        minFontSize = 14f,
+        maxFontSize = 18f,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val studentName = FieldConfig(
+        anchorX = CONTENT_CENTER_X,
+        anchorY = NAME_Y,
+        maxWidth = NAME_MAX_WIDTH,
+        maxHeight = 60f,
+        alignment = Paint.Align.CENTER,
+        minFontSize = NAME_MIN_SIZE,
+        maxFontSize = NAME_PREFERRED_SIZE,
+        color = COLOR_LGES_NAVY_ARGB
+    )
+
+    val fatherName = FieldConfig(
+        anchorX = CONTENT_CENTER_X,
+        anchorY = FATHER_Y,
+        maxWidth = FATHER_MAX_WIDTH,
+        maxHeight = 30f,
+        alignment = Paint.Align.CENTER,
+        minFontSize = FATHER_MIN_SIZE,
+        maxFontSize = FATHER_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val courseName = FieldConfig(
+        anchorX = CONTENT_CENTER_X,
+        anchorY = COURSE_START_Y,
+        maxWidth = COURSE_MAX_WIDTH,
+        maxHeight = COURSE_BOTTOM - COURSE_TOP,
+        alignment = Paint.Align.CENTER,
+        minFontSize = COURSE_MIN_SIZE,
+        maxFontSize = COURSE_PREFERRED_SIZE,
+        color = COLOR_LGES_NAVY_ARGB
+    )
+
+    val institute = FieldConfig(
+        anchorX = CONTENT_CENTER_X,
+        anchorY = 653f,
+        maxWidth = 650f,
+        maxHeight = 30f,
+        alignment = Paint.Align.CENTER,
+        minFontSize = 12f,
+        maxFontSize = 18f,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val session = FieldConfig(
+        anchorX = SESSION_X,
+        anchorY = SESSION_Y,
+        maxWidth = SESSION_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = SESSION_MIN_SIZE,
+        maxFontSize = SESSION_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val performanceGrade = FieldConfig(
+        anchorX = GRADE_X,
+        anchorY = GRADE_Y,
+        maxWidth = GRADE_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = GRADE_MIN_SIZE,
+        maxFontSize = GRADE_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val runBy = FieldConfig(
+        anchorX = INFO_BOX_X,
+        anchorY = RUN_BY_Y,
+        maxWidth = INFO_BOX_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = INFO_BOX_MIN_SIZE,
+        maxFontSize = INFO_BOX_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val courseDuration = FieldConfig(
+        anchorX = INFO_BOX_X,
+        anchorY = DURATION_Y,
+        maxWidth = INFO_BOX_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = INFO_BOX_MIN_SIZE,
+        maxFontSize = INFO_BOX_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val dateOfIssue = FieldConfig(
+        anchorX = INFO_BOX_X,
+        anchorY = DATE_OF_ISSUE_Y,
+        maxWidth = INFO_BOX_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = INFO_BOX_MIN_SIZE,
+        maxFontSize = INFO_BOX_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val placeOfIssue = FieldConfig(
+        anchorX = INFO_BOX_X,
+        anchorY = PLACE_OF_ISSUE_Y,
+        maxWidth = INFO_BOX_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = INFO_BOX_MIN_SIZE,
+        maxFontSize = INFO_BOX_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val website = FieldConfig(
+        anchorX = INFO_BOX_X,
+        anchorY = WEBSITE_Y,
+        maxWidth = INFO_BOX_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = WEBSITE_MIN_SIZE,
+        maxFontSize = WEBSITE_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val qrCode = FieldConfig(
+        anchorX = QR_DEST_LEFT,
+        anchorY = QR_DEST_TOP,
+        maxWidth = QR_DEST_SIZE,
+        maxHeight = QR_DEST_SIZE,
+        minFontSize = 0f,
+        maxFontSize = 0f
+    )
+
+    val directorSignature = FieldConfig(
+        anchorX = 1295f,
+        anchorY = 907f,
+        maxWidth = 200f,
+        maxHeight = 40f,
+        alignment = Paint.Align.CENTER,
+        minFontSize = 10f,
+        maxFontSize = 16f,
+        color = COLOR_LGES_INK_ARGB
+    )
+
+    val certificateNumber = FieldConfig(
+        anchorX = CERT_NO_X,
+        anchorY = CERT_NO_Y,
+        maxWidth = CERT_NO_MAX_WIDTH,
+        maxHeight = 25f,
+        alignment = Paint.Align.LEFT,
+        minFontSize = CERT_NO_MIN_SIZE,
+        maxFontSize = CERT_NO_PREFERRED_SIZE,
+        color = COLOR_LGES_INK_ARGB
+    )
 }
 
 /**
@@ -160,8 +355,10 @@ object CertificateDrawer {
     private const val TAG = "CertificateDrawer"
 
     // Master certificate canvas dimensions
-    const val W = 2400
-    const val H = 1600
+    const val BASE_WIDTH = 1536f
+    const val BASE_HEIGHT = 1024f
+    const val W = 1536
+    const val H = 1024
 
     private const val TEMPLATE_VERSION = "v2"
     private const val TEMPLATE_FILE = "Reference_certificate.pdf"
@@ -183,8 +380,8 @@ object CertificateDrawer {
      * Backward-compatible layout alias forwarding to CertificateLayout.
      */
     object Layout {
-        const val CANVAS_WIDTH = 2400
-        const val CANVAS_HEIGHT = 1600
+        const val CANVAS_WIDTH = 1536
+        const val CANVAS_HEIGHT = 1024
 
         const val STUDENT_NAME_CENTER_X = CertificateLayout.NAME_CENTER_X
         const val STUDENT_NAME_BASELINE_Y = CertificateLayout.NAME_Y
@@ -237,14 +434,14 @@ object CertificateDrawer {
         const val ROLL_NO_PREFERRED_SIZE = CertificateLayout.CERT_NO_PREFERRED_SIZE
         const val ROLL_NO_MIN_SIZE = CertificateLayout.CERT_NO_MIN_SIZE
 
-        const val QR_BOX_LEFT = 1538
-        const val QR_BOX_TOP = 1258
-        const val QR_BOX_WIDTH = 181
-        const val QR_BOX_HEIGHT = 183
+        const val QR_BOX_LEFT = 985
+        const val QR_BOX_TOP = 805
+        const val QR_BOX_WIDTH = 115
+        const val QR_BOX_HEIGHT = 117
 
-        const val QR_DEST_LEFT = 1553
-        const val QR_DEST_TOP = 1273
-        const val QR_DEST_SIZE = 150
+        const val QR_DEST_LEFT = 994
+        const val QR_DEST_TOP = 815
+        const val QR_DEST_SIZE = 96
     }
 
     /**
@@ -276,7 +473,7 @@ object CertificateDrawer {
     }
 
     /**
-     * Full-resolution render (2400 x 1600). Used for export and high-fidelity output.
+     * Full-resolution render (1536 x 1024). Used for export and high-fidelity output.
      */
     fun drawCertificate(
         context: Context,
@@ -381,6 +578,30 @@ object CertificateDrawer {
     }
 
     private fun loadReferenceCertificate(context: Context): Bitmap? {
+        // 1. Try loading Reference_certificate.png directly from assets for lossless 1:1 pixel rendering
+        try {
+            context.assets.open("Reference_certificate.png").use { stream ->
+                val options = android.graphics.BitmapFactory.Options().apply {
+                    inScaled = false
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                }
+                val bitmap = android.graphics.BitmapFactory.decodeStream(stream, null, options)
+                if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
+                    if (bitmap.width == W && bitmap.height == H) {
+                        return bitmap
+                    }
+                    val scaled = Bitmap.createScaledBitmap(bitmap, W, H, true)
+                    if (scaled != bitmap) {
+                        bitmap.recycle()
+                    }
+                    return scaled
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "PNG template load fallback to PDF: ${e.message}")
+        }
+
+        // 2. Fallback to PDF template
         return try {
             val cacheFile = File(context.cacheDir, "Reference_certificate_$TEMPLATE_VERSION.pdf")
 
@@ -821,6 +1042,57 @@ object CertificateDrawer {
     }
 
     /**
+     * Reusable helper to draw auto-fit text centered within a designated field bounding box.
+     */
+    fun drawAutoFitCenteredText(
+        canvas: Canvas,
+        text: String,
+        centerX: Float,
+        topY: Float,
+        maxWidth: Float,
+        maxHeight: Float,
+        minSize: Float,
+        maxSize: Float,
+        paint: Paint
+    ) {
+        val clean = normalizeWhitespace(text)
+        if (clean.isBlank()) return
+
+        val size = calculateFittedTextSize(clean, paint, maxWidth, maxSize, minSize)
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = size
+        val fm = paint.fontMetrics
+        val centerY = topY + (maxHeight / 2f)
+        val baseline = centerY - (fm.ascent + fm.descent) / 2f
+        canvas.drawText(clean, centerX, baseline, paint)
+    }
+
+    /**
+     * Reusable helper to draw auto-fit left-aligned text within a designated field width.
+     */
+    fun drawAutoFitLeftText(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        baselineY: Float,
+        maxWidth: Float,
+        minSize: Float,
+        maxSize: Float,
+        paint: Paint
+    ) {
+        drawLeftFittedText(
+            canvas = canvas,
+            text = text,
+            x = x,
+            baselineY = baselineY,
+            maxWidth = maxWidth,
+            preferredSize = maxSize,
+            minimumSize = minSize,
+            paint = paint
+        )
+    }
+
+    /**
      * Renders student name centered around centerX.
      * Prefers reducing font size on a single line so the name looks prominent and dignified.
      * Never truncates and never displays "...".
@@ -839,8 +1111,8 @@ object CertificateDrawer {
         if (clean.isBlank()) return
 
         val singleLineSize = calculateFittedTextSize(clean, paint, maxWidth, preferredSize)
-        // Prefer single-line reduction. Only in the most extreme cases (< 22f) with multiple words, wrap into 2 lines.
-        if (singleLineSize >= 22f) {
+        // Prefer single-line reduction. Only in extreme cases (< 14f) with multiple words, wrap into 2 lines.
+        if (singleLineSize >= 14f || !clean.contains(" ")) {
             paint.textAlign = Paint.Align.CENTER
             paint.textSize = singleLineSize
             canvas.drawText(clean, centerX, baselineY, paint)
@@ -856,9 +1128,9 @@ object CertificateDrawer {
                 baselineY = baselineY,
                 maxWidth = maxWidth,
                 preferredSize = preferredSize,
-                minimumSingleLineSize = 22f,
-                preferred2LineSize = 36f,
-                minimumSize = 16f,
+                minimumSingleLineSize = 14f,
+                preferred2LineSize = 22f,
+                minimumSize = minimumSize,
                 paint = paint
             )
         } else {
@@ -963,7 +1235,9 @@ object CertificateDrawer {
 
                 val overflow = max(0f, w1 - maxWidth) + max(0f, w2 - maxWidth)
                 val imbalance = abs(w1 - w2)
-                val penalty = (overflow * 5f) + imbalance
+                val connectsWithSymbol = words.getOrNull(i)?.let { it == "&" || it.equals("and", ignoreCase = true) } == true
+                val bonus = if (connectsWithSymbol && w1 <= maxWidth && w2 <= maxWidth) -150f else 0f
+                val penalty = (overflow * 5f) + imbalance + bonus
 
                 if (penalty < bestPenalty) {
                     bestPenalty = penalty

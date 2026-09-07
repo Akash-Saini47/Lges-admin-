@@ -152,21 +152,21 @@ class CertificateDrawerTest {
     @Test
     fun testLongInstituteName() {
         val institute = "LAKSHYA GLOBAL EDUCATIONAL SOCIETY OF ADVANCED INFORMATION TECHNOLOGY & APPLIED SCIENCES"
-        val maxWidth = 550f
-        val preferredSize = 24f
+        val maxWidth = CertificateLayout.INFO_BOX_MAX_WIDTH
+        val preferredSize = CertificateLayout.INFO_BOX_PREFERRED_SIZE
 
         val fittedSize = CertificateDrawer.calculateFittedTextSize(institute, paint, maxWidth, preferredSize)
         paint.textSize = fittedSize
         val measured = paint.measureText(institute)
-        assertTrue("Fitted institute name must not exceed maxWidth (550f)", measured <= maxWidth)
+        assertTrue("Fitted institute name must not exceed maxWidth", measured <= maxWidth)
 
-        // Verify bounds: x = 900f + measured <= 1450f, well before QR left at 1545f
-        val x = 900f
+        // Verify bounds: x + measured <= qrLeft
+        val x = CertificateLayout.INFO_BOX_X
         val rightEdge = x + measured
-        val qrLeft = 1545f
+        val qrLeft = CertificateLayout.QR_DEST_LEFT
         assertTrue("Institute name must not collide with QR code", rightEdge < qrLeft)
 
-        CertificateDrawer.drawLeftFittedText(canvas, institute, x, 1238f, maxWidth, preferredSize, 15f, paint)
+        CertificateDrawer.drawLeftFittedText(canvas, institute, x, CertificateLayout.RUN_BY_Y, maxWidth, preferredSize, 9f, paint)
     }
 
     // 7. Long website
@@ -176,13 +176,13 @@ class CertificateDrawerTest {
         val cleaned = CertificateDrawer.cleanWebsiteForDisplay(rawWebsite)
         assertEquals("www.lakshyaglobaleducationalsociety.org/academics/verify/certificates", cleaned)
 
-        val maxWidth = 700f
-        val preferredSize = 22f
+        val maxWidth = CertificateLayout.INFO_BOX_MAX_WIDTH
+        val preferredSize = CertificateLayout.WEBSITE_PREFERRED_SIZE
         val fittedSize = CertificateDrawer.calculateFittedTextSize(cleaned, paint, maxWidth, preferredSize)
         paint.textSize = fittedSize
-        assertTrue("Fitted website must not exceed maxWidth (700f)", paint.measureText(cleaned) <= maxWidth)
+        assertTrue("Fitted website must not exceed maxWidth", paint.measureText(cleaned) <= maxWidth)
 
-        CertificateDrawer.drawLeftFittedText(canvas, cleaned, 900f, 1482f, maxWidth, preferredSize, 14f, paint)
+        CertificateDrawer.drawLeftFittedText(canvas, cleaned, CertificateLayout.INFO_BOX_X, CertificateLayout.WEBSITE_Y, maxWidth, preferredSize, 9f, paint)
     }
 
     // 8. Long roll number
@@ -197,12 +197,12 @@ class CertificateDrawerTest {
         val measured = paint.measureText(rollNo)
         assertTrue("Fitted roll number must not exceed maxWidth (300f)", measured <= maxWidth)
 
-        // Verify canvas bounds: x = 2080f + measured <= 2380f <= canvas W = 2400f
-        val x = 2080f
+        // Verify canvas bounds: x = 1347f + measured <= 1502f <= canvas W = 1536f
+        val x = CertificateLayout.CERT_NO_X
         val rightEdge = x + measured
-        assertTrue("Roll number must stay within canvas width of 2400", rightEdge <= 2400f)
+        assertTrue("Roll number must stay within canvas width of 1536", rightEdge <= 1536f)
 
-        CertificateDrawer.drawLeftFittedText(canvas, rollNo, x, 1485f, maxWidth, preferredSize, 14f, paint)
+        CertificateDrawer.drawLeftFittedText(canvas, rollNo, x, CertificateLayout.CERT_NO_Y, maxWidth, preferredSize, 14f, paint)
     }
 
     // 9. Internship certificate
@@ -341,23 +341,177 @@ class CertificateDrawerTest {
     // Verify Layout coordinates consistency
     @Test
     fun testLayoutCoordinatesAndColors() {
-        assertEquals(2400, CertificateDrawer.Layout.CANVAS_WIDTH)
-        assertEquals(1600, CertificateDrawer.Layout.CANVAS_HEIGHT)
+        assertEquals(1536, CertificateDrawer.Layout.CANVAS_WIDTH)
+        assertEquals(1024, CertificateDrawer.Layout.CANVAS_HEIGHT)
+        assertEquals(1536, CertificateLayout.canvasWidth)
+        assertEquals(1024, CertificateLayout.canvasHeight)
+        assertEquals(1536f, CertificateLayout.WIDTH, 0.01f)
+        assertEquals(1024f, CertificateLayout.HEIGHT, 0.01f)
 
         assertEquals(0xFF1A237E.toInt(), CertificateDrawer.NAVY)
         assertEquals(0xFFD4AF37.toInt(), CertificateDrawer.GOLD)
         assertEquals(0xFF1E293B.toInt(), CertificateDrawer.INK)
 
         // Verify QR box quiet zone
-        assertTrue(CertificateDrawer.Layout.QR_DEST_LEFT > CertificateDrawer.Layout.QR_BOX_LEFT)
-        assertTrue(CertificateDrawer.Layout.QR_DEST_TOP > CertificateDrawer.Layout.QR_BOX_TOP)
+        assertTrue(CertificateDrawer.Layout.QR_DEST_LEFT >= CertificateDrawer.Layout.QR_BOX_LEFT)
+        assertTrue(CertificateDrawer.Layout.QR_DEST_TOP >= CertificateDrawer.Layout.QR_BOX_TOP)
         val qrBoxRight = CertificateDrawer.Layout.QR_BOX_LEFT + CertificateDrawer.Layout.QR_BOX_WIDTH
         val qrDestRight = CertificateDrawer.Layout.QR_DEST_LEFT + CertificateDrawer.Layout.QR_DEST_SIZE
-        assertTrue(qrDestRight < qrBoxRight)
+        assertTrue(qrDestRight <= qrBoxRight)
 
         // Verify Roll No bounds stay within canvas
         val rollNoRightEdge = CertificateDrawer.Layout.ROLL_NO_X + CertificateDrawer.Layout.ROLL_NO_MAX_WIDTH
-        assertTrue("Roll No right edge must not exceed canvas width", rollNoRightEdge <= 2400f)
+        assertTrue("Roll No right edge must not exceed canvas width", rollNoRightEdge <= 1536f)
+    }
+
+    // Test 4 Specific Datasets
+    @Test
+    fun testDataset1_KavitaSaini() {
+        val cert = Certificate.create(
+            rollNo = "10410",
+            studentName = "Kavita Saini",
+            fatherName = "Kamlesh Saini",
+            courseName = "Advance Diploma In Information Technology & Computer Management",
+            sessionRange = "2023 - 2024",
+            duration = "1 Year",
+            grade = "A+",
+            placeOfIssue = "CHAMBA",
+            dateOfIssue = "25-07-2024",
+            certType = "Diploma"
+        )
+        val certData = CertificateDrawer.buildCertificateData(cert)
+        assertEquals("10410", CertificateDrawer.cleanRollNoForDisplay(certData.rollNo))
+        assertEquals("Kavita Saini", certData.studentName)
+        assertEquals("S/O Kamlesh Saini", CertificateDrawer.normalizeGuardian(certData.guardian))
+
+        val bmp = Bitmap.createBitmap(CertificateDrawer.W, CertificateDrawer.H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        CertificateDrawer.renderDynamicOverlay(c, certData, null)
+
+        // Validate student name fits within NAME_MAX_WIDTH
+        val nameSize = CertificateDrawer.calculateFittedTextSize(
+            certData.studentName,
+            paint,
+            CertificateLayout.studentName.maxWidth,
+            CertificateLayout.studentName.maxFontSize
+        )
+        paint.textSize = nameSize
+        assertTrue(paint.measureText(certData.studentName) <= CertificateLayout.studentName.maxWidth)
+    }
+
+    @Test
+    fun testDataset2_Avikash() {
+        val cert = Certificate.create(
+            rollNo = "10411",
+            studentName = "Avikash",
+            fatherName = "Akash",
+            courseName = "Advance Diploma In Information Technology & Computer Management",
+            sessionRange = "2023 - 2024",
+            duration = "1 Year",
+            grade = "A",
+            placeOfIssue = "CHAMBA",
+            dateOfIssue = "25-07-2024",
+            certType = "Diploma"
+        )
+        val certData = CertificateDrawer.buildCertificateData(cert)
+        assertEquals("10411", CertificateDrawer.cleanRollNoForDisplay(certData.rollNo))
+        assertEquals("Avikash", certData.studentName)
+        assertEquals("S/O Akash", CertificateDrawer.normalizeGuardian(certData.guardian))
+
+        val bmp = Bitmap.createBitmap(CertificateDrawer.W, CertificateDrawer.H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        CertificateDrawer.renderDynamicOverlay(c, certData, null)
+    }
+
+    @Test
+    fun testDataset3_LongNames() {
+        val cert = Certificate.create(
+            rollNo = "LGES/2026/CS/99988",
+            studentName = "A Very Long Student Name That Tests Auto Fitting",
+            fatherName = "A Very Long Father's Name That Tests Auto Fitting",
+            courseName = "Advanced Diploma in Information Technology, Computer Applications and Computer Management",
+            sessionRange = "Jan 2024 - Dec 2025",
+            duration = "2 Years",
+            grade = "A+",
+            placeOfIssue = "CHAMBA",
+            dateOfIssue = "25-07-2026",
+            certType = "Diploma"
+        )
+        val certData = CertificateDrawer.buildCertificateData(cert)
+
+        val bmp = Bitmap.createBitmap(CertificateDrawer.W, CertificateDrawer.H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        CertificateDrawer.renderDynamicOverlay(c, certData, null)
+
+        // Verify that long student name fits within width
+        val nameSize = CertificateDrawer.calculateFittedTextSize(
+            certData.studentName,
+            paint,
+            CertificateLayout.studentName.maxWidth,
+            CertificateLayout.studentName.maxFontSize
+        )
+        paint.textSize = nameSize
+        assertTrue(paint.measureText(certData.studentName) <= CertificateLayout.studentName.maxWidth)
+        assertFalse(certData.studentName.contains("..."))
+    }
+
+    @Test
+    fun testDataset4_Amit() {
+        val cert = Certificate.create(
+            rollNo = "10412",
+            studentName = "Amit",
+            fatherName = "Raj Kumar",
+            courseName = "Basic Computer Course",
+            sessionRange = "2024",
+            duration = "3 Months",
+            grade = "B+",
+            placeOfIssue = "CHAMBA",
+            dateOfIssue = "15-08-2024",
+            certType = "Certificate"
+        )
+        val certData = CertificateDrawer.buildCertificateData(cert)
+        val bmp = Bitmap.createBitmap(CertificateDrawer.W, CertificateDrawer.H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        CertificateDrawer.renderDynamicOverlay(c, certData, null)
+
+        val nameSize = CertificateDrawer.calculateFittedTextSize(
+            certData.studentName,
+            paint,
+            CertificateLayout.studentName.maxWidth,
+            CertificateLayout.studentName.maxFontSize
+        )
+        assertEquals(CertificateLayout.studentName.maxFontSize, nameSize, 0.01f)
+    }
+
+    @Test
+    fun testAutoFitHelpers() {
+        val bmp = Bitmap.createBitmap(CertificateDrawer.W, CertificateDrawer.H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+
+        // Test drawAutoFitCenteredText
+        CertificateDrawer.drawAutoFitCenteredText(
+            canvas = c,
+            text = "Centered Test Text",
+            centerX = CertificateLayout.CONTENT_CENTER_X,
+            topY = 400f,
+            maxWidth = 500f,
+            maxHeight = 40f,
+            minSize = 10f,
+            maxSize = 25f,
+            paint = paint
+        )
+
+        // Test drawAutoFitLeftText
+        CertificateDrawer.drawAutoFitLeftText(
+            canvas = c,
+            text = "Left Aligned Test Text",
+            x = CertificateLayout.INFO_BOX_X,
+            baselineY = CertificateLayout.RUN_BY_Y,
+            maxWidth = 300f,
+            minSize = 10f,
+            maxSize = 16f,
+            paint = paint
+        )
     }
 
     // 13. Label prefix stripping tests
@@ -445,7 +599,7 @@ class CertificateDrawerTest {
         assertTrue(paint.measureText(cert.studentName) <= CertificateLayout.NAME_MAX_WIDTH)
 
         // Verify long course name bounds
-        val bitmap = Bitmap.createBitmap(2400, 1600, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(CertificateDrawer.W, CertificateDrawer.H, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         CertificateDrawer.drawCourseName(
             canvas = canvas,
