@@ -604,11 +604,122 @@ class CertificateDrawerTest {
         CertificateDrawer.drawCourseName(
             canvas = canvas,
             text = cert.course,
-            centerX = CertificateLayout.COURSE_CENTER_X,
             paint = paint
         )
 
         // Verify complete rendering without exceptions
         val outputBitmap = CertificateDrawer.renderDynamicOverlay(canvas, cert, null)
+    }
+
+    // 15. Mandatory Test Case 1: Avikash with Advance Diploma In Information Technology & Computer Management
+    @Test
+    fun testMandatoryTestCase1_Avikash() {
+        val cert = CertificateData(
+            rollNo = "2026LGES014",
+            certificateId = "LGES/2026/014",
+            studentName = "Avikash",
+            guardian = "S/O: Surendra Kumar",
+            course = "Advance Diploma In Information Technology & Computer Management",
+            session = "2025-2026",
+            grade = "A+",
+            runBy = "LAKSHMI GROUP OF EDUCATION SOCIETY",
+            duration = "450 Hours",
+            dateOfIssue = "07-09-2026",
+            placeOfIssue = "Niwaru, Jaipur (RAJASTHAN)",
+            website = "HTTPS://LGES-COMPUTER-CLASSES.NETLIFY.APP"
+        )
+
+        val b = Bitmap.createBitmap(CertificateLayout.CANVAS_WIDTH, CertificateLayout.CANVAS_HEIGHT, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+
+        // Draw course name using new bounded engine
+        CertificateDrawer.drawCourseName(c, cert.course, paint)
+
+        // Draw bottom-left table using new bounded grid engine
+        CertificateDrawer.drawBottomLeftTable(c, cert, paint)
+
+        // Draw entire dynamic data
+        CertificateDrawer.drawDynamicData(c, cert)
+
+        // Verify guardian normalization
+        assertEquals("S/O Surendra Kumar", CertificateDrawer.normalizeGuardian(cert.guardian))
+
+        // Verify website display preserves protocol
+        assertEquals("HTTPS://LGES-COMPUTER-CLASSES.NETLIFY.APP", CertificateDrawer.cleanWebsiteForDisplay(cert.website))
+
+        // Verify place of issue
+        assertEquals("Niwaru, Jaipur (RAJASTHAN)", CertificateDrawer.cleanPlaceOfIssueForDisplay(cert.placeOfIssue))
+    }
+
+    // 16. Mandatory Test Case 2: Kavita Saini with Advance Diploma In Computer Application
+    @Test
+    fun testMandatoryTestCase2_KavitaSaini() {
+        val cert = CertificateData(
+            rollNo = "2026LGES015",
+            certificateId = "LGES/2026/015",
+            studentName = "Kavita Saini",
+            guardian = "D/O: Ramavtar Saini",
+            course = "Advance Diploma In Computer Application",
+            session = "2025-2026",
+            grade = "A+",
+            runBy = "LAKSHMI GROUP OF EDUCATION SOCIETY",
+            duration = "450 Hours",
+            dateOfIssue = "07-09-2026",
+            placeOfIssue = "Niwaru, Jaipur (RAJASTHAN)",
+            website = "HTTPS://LGES-COMPUTER-CLASSES.NETLIFY.APP"
+        )
+
+        val b = Bitmap.createBitmap(CertificateLayout.CANVAS_WIDTH, CertificateLayout.CANVAS_HEIGHT, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+
+        CertificateDrawer.drawDynamicData(c, cert)
+
+        assertEquals("D/O Ramavtar Saini", CertificateDrawer.normalizeGuardian(cert.guardian))
+        assertEquals("2026LGES015", cert.rollNo)
+        assertEquals("Kavita Saini", cert.studentName)
+    }
+
+    // 17. Fixed Table Column Alignments Verification
+    @Test
+    fun testTableFixedGridCoordinates() {
+        // Table columns must match exact constants
+        assertEquals(382f, CertificateLayout.ICON_X, 0.01f)
+        assertEquals(402f, CertificateLayout.LABEL_LEFT, 0.01f)
+        assertEquals(566f, CertificateLayout.COLON_X, 0.01f)
+        assertEquals(582f, CertificateLayout.VALUE_LEFT, 0.01f)
+        assertEquals(356f, CertificateLayout.VALUE_WIDTH, 0.01f)
+
+        // All 5 rows must have strictly fixed vertical baselines
+        assertEquals(813f, CertificateLayout.ROW_1_Y, 0.01f)
+        assertEquals(847f, CertificateLayout.ROW_2_Y, 0.01f)
+        assertEquals(881f, CertificateLayout.ROW_3_Y, 0.01f)
+        assertEquals(915f, CertificateLayout.ROW_4_Y, 0.01f)
+        assertEquals(948f, CertificateLayout.ROW_5_Y, 0.01f)
+
+        // Values column must NEVER overlap QR frame
+        assertTrue(CertificateLayout.VALUE_LEFT + CertificateLayout.VALUE_WIDTH < CertificateLayout.QR_FRAME_LEFT)
+    }
+
+    // 18. Course Name Strict Bounding Verification
+    @Test
+    fun testCourseNameBoundingBox() {
+        assertEquals(480f, CertificateLayout.COURSE_BOX_LEFT, 0.01f)
+        assertEquals(1252f, CertificateLayout.COURSE_BOX_RIGHT, 0.01f)
+        assertEquals(530f, CertificateLayout.COURSE_BOX_TOP, 0.01f)
+        assertEquals(612f, CertificateLayout.COURSE_BOX_BOTTOM, 0.01f)
+        assertEquals(866f, CertificateLayout.COURSE_CENTER_X, 0.01f)
+        assertEquals(772f, CertificateLayout.COURSE_MAX_WIDTH, 0.01f)
+        assertEquals(390f, CertificateLayout.COURSE_ORNAMENT_MAX_WIDTH, 0.01f)
+
+        // Short course fitting test
+        val b = Bitmap.createBitmap(CertificateLayout.CANVAS_WIDTH, CertificateLayout.CANVAS_HEIGHT, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+        CertificateDrawer.drawCourseName(c, "ADCA", paint)
+
+        // Multi-line course fitting test with &
+        CertificateDrawer.drawCourseName(c, "Advance Diploma In Information Technology & Computer Management", paint)
+
+        // Extremely long course fitting test
+        CertificateDrawer.drawCourseName(c, "Executive Post Graduate Professional Master Diploma In Advanced Artificial Intelligence Machine Learning Data Science & Cloud Computing Technologies", paint)
     }
 }
