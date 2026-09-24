@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.database.Certificate
+import com.example.util.CertificateConfig
 import com.example.database.SyncStatus
 import com.example.ui.CertificateDrawer
 import com.example.ui.Exporter
@@ -158,12 +159,12 @@ fun CertificatesTab(
                         onEdit = { onEditCertificate(cert) },
                         onDelete = { certificateToDelete = cert },
                         onExportPdf = {
-                            val qr = Exporter.generateQrCode(cert.certificateId, 250)
+                            val qr = Exporter.generateQrCode(CertificateConfig.buildVerificationUrl(cert.certificateId), 250)
                             val bitmap = CertificateDrawer.drawCertificate(context, cert, qr)
                             Exporter.savePdfToDevice(context, bitmap, "${cert.rollNo}_${cert.studentName}")
                         },
                         onShare = {
-                            val qr = Exporter.generateQrCode(cert.certificateId, 250)
+                            val qr = Exporter.generateQrCode(CertificateConfig.buildVerificationUrl(cert.certificateId), 250)
                             val bitmap = CertificateDrawer.drawCertificate(context, cert, qr)
                             Exporter.sharePdf(context, bitmap, "${cert.rollNo}_${cert.studentName}")
                         }
