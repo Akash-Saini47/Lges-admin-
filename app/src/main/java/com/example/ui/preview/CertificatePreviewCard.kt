@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.database.Certificate
+import com.example.util.CertificateConfig
 import com.example.ui.CertificateDrawer
 import com.example.ui.Exporter
 import com.example.ui.components.DocumentCard
@@ -90,7 +91,7 @@ fun CertificatePreviewCard(
 
         withContext(Dispatchers.Default) {
             try {
-                val qr = Exporter.generateQrCode(certificate.certificateId, 200)
+                val qr = Exporter.generateQrCode(CertificateConfig.buildVerificationUrl(certificate.certificateId), 200)
                 val bitmap = CertificateDrawer.drawPreviewCertificate(
                     context = context,
                     cert = certificate,
@@ -169,7 +170,7 @@ fun CertificatePreviewCard(
         ) {
             OutlinedButton(
                 onClick = {
-                    val qr = Exporter.generateQrCode(certificate.certificateId, 300)
+                    val qr = Exporter.generateQrCode(CertificateConfig.buildVerificationUrl(certificate.certificateId), 300)
                     val fullBitmap = CertificateDrawer.drawCertificate(context, certificate, qr)
                     Exporter.saveBitmapToDevice(context, fullBitmap, "${certificate.rollNo}_${certificate.studentName}")
                 },
@@ -182,7 +183,7 @@ fun CertificatePreviewCard(
 
             Button(
                 onClick = {
-                    val qr = Exporter.generateQrCode(certificate.certificateId, 300)
+                    val qr = Exporter.generateQrCode(CertificateConfig.buildVerificationUrl(certificate.certificateId), 300)
                     val fullBitmap = CertificateDrawer.drawCertificate(context, certificate, qr)
                     Exporter.savePdfToDevice(context, fullBitmap, "${certificate.rollNo}_${certificate.studentName}")
                 },
@@ -204,7 +205,7 @@ fun CertificatePreviewCard(
 
             OutlinedButton(
                 onClick = {
-                    val qr = Exporter.generateQrCode(certificate.certificateId, 300)
+                    val qr = Exporter.generateQrCode(CertificateConfig.buildVerificationUrl(certificate.certificateId), 300)
                     val fullBitmap = CertificateDrawer.drawCertificate(context, certificate, qr)
                     Exporter.sharePdf(context, fullBitmap, "${certificate.rollNo}_${certificate.studentName}")
                 },
